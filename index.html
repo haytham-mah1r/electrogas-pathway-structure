@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electrogas · Site Navigation Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12"></script>
+<style>
+  :root{
+    --bg:#F6F7F9;
+    --panel:#FFFFFF;
+    --panel-2:#FFFFFF;
+    --line:#E2E5EA;
+    --text:#1B2027;
+    --text-dim:#525A67;
+    --text-dimmer:#7C8494;
+    --amber:#C6862E;
+    --cyan:#137F89;
+    --rust:#BE4A2C;
+    --slate:#848DA0;
+    --root:#2E3644;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  body{padding-bottom:64px;}
+
+  .wrap{max-width:1680px;margin:0 auto;padding:0 24px;}
+
+  header{border-bottom:1px solid var(--line);padding:36px 0 22px;}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;margin:0 0 10px;}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,3.4vw,38px);margin:0 0 10px;letter-spacing:-0.01em;}
+  .sub{font-family:var(--font-body);color:var(--text-dim);font-size:14.5px;line-height:1.6;max-width:720px;margin:0 0 22px;}
+
+  .stats{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:fit-content;}
+  .stat{padding:12px 22px;border-right:1px solid var(--line);}
+  .stat:last-child{border-right:none;}
+  .stat .n{font-family:var(--font-mono);font-size:20px;font-weight:500;color:var(--text);}
+  .stat .l{font-size:10.5px;color:var(--text-dimmer);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:22px;}
+  .legend-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);}
+  .swatch{width:9px;height:9px;border-radius:2px;display:inline-block;}
+
+  .panel{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .panel-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;}
+  .panel-head h2{font-family:var(--font-display);font-size:15px;margin:0;font-weight:500;}
+  .panel-head .hint{font-size:11.5px;color:var(--text-dimmer);font-family:var(--font-mono);}
+
+  .chart-scroll{overflow-x:auto;overflow-y:visible;background-color:#FFFFFF;background-image:
+    linear-gradient(to right, rgba(27,32,39,0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27,32,39,0.035) 1px, transparent 1px);
+    background-size:32px 32px;}
+  .chart-scroll::-webkit-scrollbar{height:10px;}
+  .chart-scroll::-webkit-scrollbar-track{background:var(--panel);}
+  .chart-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+
+  svg{display:block;}
+  .node-rect{stroke:rgba(27,32,39,0.18);stroke-width:.75;transition:opacity .15s ease;}
+  .link-glyph{fill:var(--cyan);}
+  .link-path{fill:none;cursor:pointer;transition:opacity .15s ease, stroke-width .15s ease;}
+  .col-header{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;fill:var(--text-dimmer);text-transform:uppercase;}
+  .lbl-name{font-family:var(--font-body);fill:var(--text);pointer-events:none;}
+  .lbl-name.dim{fill:var(--text-dim);}
+  .lbl-val{font-family:var(--font-mono);fill:var(--text-dimmer);pointer-events:none;}
+
+  #tooltip{position:fixed;pointer-events:none;z-index:50;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;padding:9px 13px;font-size:12.5px;line-height:1.55;box-shadow:0 12px 30px rgba(27,32,39,0.14);opacity:0;transform:translateY(4px);transition:opacity .12s ease, transform .12s ease;max-width:340px;}
+  #tooltip.show{opacity:1;transform:translateY(0);}
+  #tooltip .t-path{font-family:var(--font-mono);color:var(--text);word-break:break-all;}
+  #tooltip .t-meta{color:var(--text-dim);margin-top:3px;}
+  #tooltip .t-val{color:var(--cyan);font-family:var(--font-mono);}
+
+  footer{max-width:1680px;margin:26px auto 0;padding:0 24px;color:var(--text-dimmer);font-size:12px;line-height:1.7;}
+  footer strong{color:var(--text-dim);}
+
+  @media (max-width:640px){
+    h1{font-size:22px;}
+    .stat{padding:10px 14px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Path Exploration · Reconstructed</p>
+    <h1>Electrogas.com — Site Navigation Flow</h1>
+    <p class="sub">Where visitors land, and where they go next. Rebuilt as one diagram from a multi-page analytics export so the full entry → next‑page → then sequence reads in a single view.</p>
+    <div class="stats" id="stats"></div>
+    <div class="legend">
+      <span class="legend-item"><span class="swatch" style="background:var(--root)"></span>Home ( / )</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--amber)"></span>Product &amp; equipment pages</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--cyan)"></span>Company &amp; resource pages</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--rust)"></span>Contact &amp; promo pages</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--slate)"></span>Other / long tail</span>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Session flow, three pages deep</h2>
+      <span class="hint">bar thickness = √(sessions) for readability · hover for counts · click a page to open it</span>
+    </div>
+    <div class="chart-scroll">
+      <svg id="chart"></svg>
+    </div>
+  </div>
+
+  <footer>
+    <strong>How to read this:</strong> the left bar is every tracked session starting at <span style="font-family:var(--font-mono)">/</span>. Each ribbon flowing right is the next page those sessions landed on, and — for the three busiest sections (multi‑gas detectors, single‑gas detectors, and the About page) — the page after that. Flow width is square‑root scaled so low‑volume paths stay visible next to high‑volume ones; the true session count is always in the label and the hover tooltip.
+    <br><strong>Links:</strong> every page name marked <span class="link-glyph" style="font-family:var(--font-mono)">↗</span> is a live link, matched against the site's own XML sitemaps — click it to open the real page in a new tab. Two things aren't linked: <span style="font-family:var(--font-mono)">Others</span>, which rolls up many small long‑tail paths rather than one page, and <span style="font-family:var(--font-mono)">/current-promotions/</span>, which no longer appears in the current sitemap. The four "multi‑gas‑clip" pages under the Multi‑Gas Detectors branch were shown identically (and truncated) in the original export, so they're matched here to the four real multi‑gas‑clip product pages — the session counts are accurate, the exact page‑to‑count pairing among those four is a best‑effort guess.
+  </footer>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+/* ---------------------------------------------------------
+   1. DATA
+   Reconstructed from the supplied Path Exploration screenshots.
+   Edit this tree to correct or extend the data — the chart
+   below rebuilds itself entirely from it.
+--------------------------------------------------------- */
+const tree = {
+  name: "/", value: 3315,
+  children: [
+    { name: "/contact-us/", value: 290 },
+    { name: "/gas-detection/multi-gas-detection/", value: 131, children: [
+      { name: "/project/gasalert-microclip-series/", value: 27 },
+      { name: "/", value: 13 },
+      { name: "/project/multi-gas-clip-simple-plus/", value: 11 },
+      { name: "/project/altair-4xr/", value: 9 },
+      { name: "/project/g8-portable-gas-detector/", value: 8 },
+      { name: "/project/multi-gas-clip-infrared/", value: 7 },
+      { name: "/project/bw-flex/", value: 5 },
+      { name: "/project/g7-c-x/", value: 4 },
+      { name: "/project/gx-3r/", value: 4 },
+      { name: "/project/gx-force/", value: 4 },
+      { name: "/project/x-am-5000/", value: 4 },
+      { name: "/electrogas-mini-catalogue/", value: 3 },
+      { name: "/project/multi-gas-clip-pump-infrared/", value: 3 },
+      { name: "/project/multi-gas-clip-simple/", value: 3 },
+      { name: "/calibration-equipment/", value: 2 },
+      { name: "/contact-us/", value: 2 },
+      { name: "/gas-detection/single-gas-detection/", value: 2 },
+      { name: "/gas-detection/specialty-gas-detection/", value: 2 },
+      { name: "/project/x-am-2500/", value: 2 },
+      { name: "/project/x-am-5600/", value: 2 },
+      { name: "Others", value: 14 },
+    ]},
+    { name: "/gas-detection/single-gas-detection/", value: 66, children: [
+      { name: "/", value: 15 },
+      { name: "/project/bw-clip-series/", value: 9 },
+      { name: "/gas-detection/multi-gas-detection/", value: 8 },
+      { name: "/fixed-gas-detection/", value: 4 },
+      { name: "/project/pac-6500/", value: 4 },
+      { name: "/contact-us/", value: 3 },
+      { name: "/electrogas-mini-catalogue/", value: 2 },
+      { name: "/gas-detection/gas-detection-tubes/", value: 2 },
+      { name: "/project/g6-single-gas/", value: 2 },
+      { name: "/air-carts-air-trailers/", value: 1 },
+      { name: "/calibration-equipment/", value: 1 },
+      { name: "/gas-detection/", value: 1 },
+      { name: "/gas-detection/area-gas-detection/", value: 1 },
+      { name: "/gas-detection/specialty-gas-detection/", value: 1 },
+      { name: "/project/04-series/", value: 1 },
+      { name: "/project/altair-2x/", value: 1 },
+      { name: "/project/arearae-plus/", value: 1 },
+      { name: "/project/pac-8000/", value: 1 },
+      { name: "/project/single-gas-clip/", value: 1 },
+      { name: "/project/toxirae-pro-pid/", value: 1 },
+      { name: "Others", value: 6 },
+    ]},
+    { name: "/about-electrogas/", value: 64, children: [
+      { name: "/", value: 17 },
+      { name: "/contact-us/", value: 11 },
+      { name: "/join-our-team/", value: 7 },
+      { name: "/service/", value: 5 },
+      { name: "/fixed-gas-detection/", value: 2 },
+      { name: "/gas-detection/multi-gas-detection/", value: 2 },
+      { name: "/products/", value: 2 },
+      { name: "/air-carts-air-trailers/", value: 1 },
+      { name: "/current-promotions/", value: 1 },
+      { name: "/faqs/", value: 1 },
+      { name: "/online-training/", value: 1 },
+      { name: "/project/bw-flex-5/", value: 1 },
+      { name: "/rental-equipment/gas-detection-rentals/", value: 1 },
+      { name: "Others", value: 12 },
+    ]},
+    { name: "/join-our-team/", value: 45 },
+    { name: "/rental-equipment/gas-detection-rentals/", value: 45 },
+    { name: "/calibration-equipment/", value: 36 },
+    { name: "/gas-detection/", value: 33 },
+    { name: "/service/", value: 28 },
+    { name: "/electrogas-mini-catalogue/", value: 26 },
+    { name: "/gas-detection/area-gas-detection/", value: 19 },
+    { name: "/products/", value: 19 },
+    { name: "/fall-protection-equipment/", value: 17 },
+    { name: "/fixed-gas-detection/", value: 16 },
+    { name: "/self-contained-breathing-apparatus/", value: 16 },
+    { name: "/gas-detection/specialty-gas-detection/", value: 14 },
+    { name: "/respiratory-protection/", value: 14 },
+    { name: "/current-promotions/", value: 12 },
+    { name: "/rental-equipment/", value: 10 },
+    { name: "/benzene-landing-page/", value: 7 },
+    { name: "Others", value: 110 },
+  ]
+};
+
+/* ---------------------------------------------------------
+   1b. LIVE URL RESOLUTION
+   Matched against the site's actual XML sitemaps. Anything
+   not found there (rollups, and one page that no longer
+   appears in the current sitemap) is left unlinked.
+--------------------------------------------------------- */
+const SITE = "https://www.electrogasmonitors.com";
+const UNLINKABLE = new Set(["Others", "/current-promotions/"]);
+function urlFor(path){
+  if (UNLINKABLE.has(path)) return null;
+  return SITE + path;
+}
+
+/* ---------------------------------------------------------
+   2. CATEGORY COLORS (semantic, not decorative)
+--------------------------------------------------------- */
+const COLORS = { home:'#B8C0CC', product:'#E3A857', company:'#4EC0C9', conversion:'#D9694F', other:'#6E7580' };
+const PRODUCT = ['/project','/gas-detection','/fixed-gas-detection','/self-contained-breathi','/respiratory-protection','/fall-protection-equip','/calibration-equipment','/rental-equipment','/electrogas-mini-catal','/products','/air-carts-air-trailers'];
+const COMPANY = ['/about-electrogas','/join-our-team','/faqs','/service','/online-training'];
+const CONVERSION = ['/contact-us','/current-promotions','/benzene-landing-page'];
+
+function categorize(path){
+  if (path === '/') return 'home';
+  if (path === 'Others') return 'other';
+  if (PRODUCT.some(p => path.startsWith(p))) return 'product';
+  if (COMPANY.some(p => path.startsWith(p))) return 'company';
+  if (CONVERSION.some(p => path.startsWith(p))) return 'conversion';
+  return 'other';
+}
+
+/* ---------------------------------------------------------
+   3. FLATTEN TREE -> nodes / links (sqrt-scaled link value
+   for legible widths; true counts kept as `.count`)
+--------------------------------------------------------- */
+const nodes = [];
+const links = [];
+let idc = 0;
+
+function addNode(t, parent){
+  const cat = categorize(t.name);
+  const node = { id: idc++, name: t.name, count: t.value, cat, color: COLORS[cat], url: t.name === '/' ? SITE + '/' : urlFor(t.name) };
+  nodes.push(node);
+  if (parent){
+    links.push({ source: parent.id, target: node.id, value: Math.sqrt(t.value), count: t.value });
+  }
+  (t.children || []).forEach(c => addNode(c, node));
+  return node;
+}
+addNode(tree, null);
+
+/* ---------------------------------------------------------
+   4. STATS STRIP
+--------------------------------------------------------- */
+const level1 = tree.children;
+const totalSessions = tree.value;
+const trackedNext = level1.reduce((s,c)=>s+c.value,0);
+const expandedBranches = level1.filter(c=>c.children).length;
+const statsEl = document.getElementById('stats');
+[
+  [totalSessions.toLocaleString(), 'Sessions at /'],
+  [trackedNext.toLocaleString(), 'Continued to a next page'],
+  [level1.length, 'Distinct next pages'],
+  [expandedBranches, 'Traced a 3rd page'],
+].forEach(([n,l])=>{
+  const d = document.createElement('div');
+  d.className = 'stat';
+  d.innerHTML = `<div class="n">${n}</div><div class="l">${l}</div>`;
+  statsEl.appendChild(d);
+});
+
+/* ---------------------------------------------------------
+   5. LAYOUT
+--------------------------------------------------------- */
+const MARGIN = { top: 46, right: 430, bottom: 40, left: 26 };
+const WIDTH = 1600;
+
+// count nodes per depth (needs a first pass) to size height
+const depthCounts = {};
+function passDepth(t, depth){
+  depthCounts[depth] = (depthCounts[depth]||0) + 1;
+  (t.children||[]).forEach(c => passDepth(c, depth+1));
+}
+passDepth(tree, 0);
+const maxCol = Math.max(...Object.values(depthCounts));
+const HEIGHT = Math.max(1400, maxCol * 46 + 200);
+
+const svg = d3.select('#chart')
+  .attr('width', WIDTH)
+  .attr('height', HEIGHT)
+  .attr('viewBox', `0 0 ${WIDTH} ${HEIGHT}`);
+
+const sankeyGen = d3.sankey()
+  .nodeId(d => d.id)
+  .nodeAlign(d3.sankeyLeft)
+  .nodeWidth(16)
+  .nodePadding(7)
+  .extent([[MARGIN.left, MARGIN.top], [WIDTH - MARGIN.right, HEIGHT - MARGIN.bottom]]);
+
+const graph = sankeyGen({
+  nodes: nodes.map(d => Object.assign({}, d)),
+  links: links.map(d => Object.assign({}, d)),
+});
+
+// safety clamp so nothing renders sub-pixel
+graph.nodes.forEach(n => { if (n.y1 - n.y0 < 2) { const m=(n.y0+n.y1)/2; n.y0=m-1; n.y1=m+1; } });
+graph.links.forEach(l => { if (l.width < 1.2) l.width = 1.2; });
+
+/* ---------------------------------------------------------
+   6. COLUMN HEADERS
+--------------------------------------------------------- */
+const byDepth = d3.group(graph.nodes, d => d.depth);
+const headerLabels = ['Entry page', 'Next page', 'Then'];
+byDepth.forEach((list, depth) => {
+  const x = d3.min(list, d => d.x0);
+  svg.append('text')
+    .attr('class','col-header')
+    .attr('x', x)
+    .attr('y', MARGIN.top - 20)
+    .text(headerLabels[depth] || '');
+});
+
+/* ---------------------------------------------------------
+   7. LINKS
+--------------------------------------------------------- */
+const linkGen = d3.sankeyLinkHorizontal();
+
+const linkSel = svg.append('g').attr('fill','none')
+  .selectAll('path')
+  .data(graph.links)
+  .join('path')
+  .attr('class','link-path')
+  .attr('d', linkGen)
+  .attr('stroke', d => d.target.color)
+  .attr('stroke-width', d => d.width)
+  .attr('stroke-opacity', 0.42);
+
+/* ---------------------------------------------------------
+   8. NODES
+--------------------------------------------------------- */
+const nodeG = svg.append('g').selectAll('g')
+  .data(graph.nodes)
+  .join('g')
+  .style('cursor', d => d.url ? 'pointer' : 'default')
+  .on('click', (evt, d) => { if (d.url) window.open(d.url, '_blank', 'noopener'); });
+
+nodeG.append('rect')
+  .attr('class','node-rect')
+  .attr('x', d => d.x0)
+  .attr('y', d => d.y0)
+  .attr('width', d => d.x1 - d.x0)
+  .attr('height', d => d.y1 - d.y0)
+  .attr('rx', 2)
+  .attr('fill', d => d.color)
+  .attr('fill-opacity', d => d.depth === 0 ? 1 : 0.94);
+
+nodeG.append('text')
+  .attr('class', d => 'lbl-name' + (d.depth >= 2 ? ' dim' : ''))
+  .attr('x', d => d.x1 + 7)
+  .attr('y', d => (d.y0 + d.y1) / 2 - (d.depth <= 1 ? 3 : 1) )
+  .attr('font-size', d => d.depth === 0 ? 13.5 : d.depth === 1 ? 12 : 10)
+  .attr('font-weight', d => d.depth === 0 ? 600 : 500)
+  .attr('dominant-baseline', 'middle')
+  .text(d => d.depth === 0 ? 'All sessions' : d.name)
+  .filter(d => !!d.url)
+  .append('tspan')
+    .attr('class','link-glyph')
+    .attr('dx', 4)
+    .attr('font-size', '0.8em')
+    .text('↗');
+
+nodeG.append('text')
+  .attr('class','lbl-val')
+  .attr('x', d => d.x1 + 7)
+  .attr('y', d => (d.y0 + d.y1) / 2 + (d.depth <= 1 ? 11 : 9))
+  .attr('font-size', d => d.depth <= 1 ? 10.5 : 9)
+  .attr('dominant-baseline', 'middle')
+  .text(d => d.count.toLocaleString() + (d.depth === 0 ? ' sessions' : ''));
+
+/* ---------------------------------------------------------
+   9. INTERACTION
+--------------------------------------------------------- */
+const tooltip = document.getElementById('tooltip');
+function showTip(html, evt){
+  tooltip.innerHTML = html;
+  tooltip.classList.add('show');
+  moveTip(evt);
+}
+function moveTip(evt){
+  const pad = 16;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + 320 > window.innerWidth) x = evt.clientX - 320 - pad;
+  if (y + 90 > window.innerHeight) y = evt.clientY - 90 - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTip(){ tooltip.classList.remove('show'); }
+
+function dim(exceptLinks, exceptNodes){
+  linkSel.attr('stroke-opacity', d => exceptLinks.has(d) ? 0.85 : 0.06);
+  nodeG.selectAll('rect').attr('fill-opacity', d => exceptNodes.has(d) ? 1 : 0.18);
+}
+function resetDim(){
+  linkSel.attr('stroke-opacity', 0.42);
+  nodeG.selectAll('rect').attr('fill-opacity', d => d.depth === 0 ? 1 : 0.94);
+}
+
+nodeG.select('rect')
+  .on('mousemove', (evt,d) => moveTip(evt))
+  .on('mouseenter', (evt, d) => {
+    const connected = new Set(graph.links.filter(l => l.source === d || l.target === d));
+    const connNodes = new Set([d]);
+    connected.forEach(l => { connNodes.add(l.source); connNodes.add(l.target); });
+    dim(connected, connNodes);
+    const parentLink = graph.links.find(l => l.target === d);
+    const pct = parentLink ? ((d.count / parentLink.source.count) * 100).toFixed(1) + '% of ' + (parentLink.source.depth===0?'all sessions':parentLink.source.name) : null;
+    const linkLine = d.url
+      ? `<div class="t-meta" style="color:var(--cyan);margin-top:4px;">↗ click to open page</div>`
+      : d.name === 'Others'
+        ? `<div class="t-meta" style="margin-top:4px;">rollup of several low-volume paths — no single page</div>`
+        : `<div class="t-meta" style="margin-top:4px;">not in the current sitemap — likely retired</div>`;
+    showTip(`<div class="t-path">${d.depth===0?'/':d.name}</div><div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> sessions${pct?' · '+pct:''}</div>${linkLine}`, evt);
+  })
+  .on('mouseleave', () => { resetDim(); hideTip(); });
+
+linkSel
+  .on('mousemove', (evt,d) => moveTip(evt))
+  .on('mouseenter', (evt, d) => {
+    dim(new Set([d]), new Set([d.source, d.target]));
+    showTip(`<div class="t-path">${d.source.depth===0?'/':d.source.name} → ${d.target.name}</div><div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> sessions</div>`, evt);
+  })
+  .on('mouseleave', () => { resetDim(); hideTip(); });
+</script>
+</body>
+</html>
