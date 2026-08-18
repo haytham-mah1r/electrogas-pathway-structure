@@ -91,12 +91,20 @@
 
   #tooltip{position:fixed;pointer-events:none;z-index:50;background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;padding:9px 13px;font-size:12.5px;line-height:1.55;box-shadow:0 12px 30px rgba(27,32,39,0.14);opacity:0;transform:translateY(4px);transition:opacity .12s ease, transform .12s ease;max-width:340px;}
   #tooltip.show{opacity:1;transform:translateY(0);}
-  #tooltip .t-path{font-family:var(--font-mono);color:var(--text);word-break:break-all;}
+  #tooltip .t-path{font-family:var(--font-body);font-weight:600;color:var(--text);}
+  #tooltip .t-path-sub{font-family:var(--font-mono);font-size:10px;color:var(--text-dimmer);margin-top:1px;word-break:break-all;}
   #tooltip .t-meta{color:var(--text-dim);margin-top:3px;}
   #tooltip .t-val{color:var(--cyan);font-family:var(--font-mono);}
 
   footer{max-width:1680px;margin:26px auto 0;padding:0 24px;color:var(--text-dimmer);font-size:12px;line-height:1.7;}
   footer strong{color:var(--text-dim);}
+  footer p{margin:0 0 8px;}
+  footer details{margin-top:2px;}
+  footer summary{cursor:pointer;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;letter-spacing:.02em;list-style:none;}
+  footer summary::-webkit-details-marker{display:none;}
+  footer summary::before{content:"+ ";color:var(--cyan);}
+  footer details[open] summary::before{content:"– ";}
+  footer details p{margin-top:8px;}
 
   @media (max-width:640px){
     h1{font-size:22px;}
@@ -108,27 +116,27 @@
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">Path Exploration · Reconstructed</p>
-    <h1>Electrogas.com — Site Navigation Flow</h1>
-    <p class="sub">Where visitors land, and where they go next. Rebuilt as one diagram from a multi-page analytics export so the full entry → next‑page → then sequence reads in a single view.</p>
+    <p class="eyebrow">Visitor Journey</p>
+    <h1>Electrogas.com — Where People Go on the Site</h1>
+    <p class="sub">Starting from the homepage, this shows the pages visitors land on next, and — for the three most-visited sections — the page after that.</p>
     <div class="stats" id="stats"></div>
     <div class="legend">
-      <span class="legend-item"><span class="swatch" style="background:var(--root)"></span>Home ( / )</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--root)"></span>Homepage</span>
       <span class="legend-item"><span class="swatch" style="background:var(--amber)"></span>Product &amp; equipment pages</span>
       <span class="legend-item"><span class="swatch" style="background:var(--cyan)"></span>Company &amp; resource pages</span>
       <span class="legend-item"><span class="swatch" style="background:var(--rust)"></span>Contact &amp; promo pages</span>
-      <span class="legend-item"><span class="swatch" style="background:var(--slate)"></span>Other / long tail</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--slate)"></span>Other pages</span>
     </div>
   </header>
 
   <div class="panel">
     <div class="panel-head">
-      <h2>Session flow, three pages deep</h2>
-      <span class="hint">bar thickness = √(sessions) · hover for counts · click to open a page · click + drag to pan</span>
+      <h2>Where visitors go, step by step</h2>
+      <span class="hint">thicker line = more visits · hover a page for details · drag to pan around</span>
     </div>
     <div class="panel-body">
       <nav class="side-nav" id="sideNav" aria-label="Jump to entry page">
-        <h3>Entry pages · click to jump</h3>
+        <h3>Jump to a page</h3>
         <div class="side-nav-list" id="sideNavList"></div>
       </nav>
       <div class="chart-scroll">
@@ -139,8 +147,11 @@
   </div>
 
   <footer>
-    <strong>How to read this:</strong> the left bar is every tracked session starting at <span style="font-family:var(--font-mono)">/</span>. Each ribbon flowing right is the next page those sessions landed on, and — for the three busiest sections (multi‑gas detectors, single‑gas detectors, and the About page) — the page after that. Flow width is square‑root scaled so low‑volume paths stay visible next to high‑volume ones; the true session count is always in the label and the hover tooltip.
-    <br><strong>Links:</strong> every page name marked <span class="link-glyph" style="font-family:var(--font-mono)">↗</span> is a live link, matched against the site's own XML sitemaps — click it to open the real page in a new tab. Two things aren't linked: <span style="font-family:var(--font-mono)">Others</span>, which rolls up many small long‑tail paths rather than one page, and <span style="font-family:var(--font-mono)">/current-promotions/</span>, which no longer appears in the current sitemap. The four "multi‑gas‑clip" pages under the Multi‑Gas Detectors branch were shown identically (and truncated) in the original export, so they're matched here to the four real multi‑gas‑clip product pages — the session counts are accurate, the exact page‑to‑count pairing among those four is a best‑effort guess.
+    <p>Each line is visitors moving from one page to the next; a thicker line means more visitors took that path. Page names marked <span class="link-glyph" style="font-family:var(--font-mono)">↗</span> open the real, live page in a new tab.</p>
+    <details>
+      <summary>Notes on how this was put together</summary>
+      <p>Rebuilt from a multi-part analytics export. Flow width uses a square-root scale so smaller paths stay visible next to the biggest ones — the exact visit count is always in the tooltip. To keep each section easy to scan, only the top pages in the three detailed sections (Multi‑Gas Detectors, Single‑Gas Detectors, About Electrogas) are shown individually; smaller paths are grouped into "Other pages," the same way the analytics tool groups its own long tail. "Other pages" and <span style="font-family:var(--font-mono)">/current-promotions/</span> (no longer live) aren't linked, since they don't point to one single page.</p>
+    </details>
   </footer>
 </div>
 
@@ -253,6 +264,90 @@ function urlFor(path){
 }
 
 /* ---------------------------------------------------------
+   1c. PLAIN-ENGLISH LABELS
+   The chart is for a non-technical client, so every node
+   displays a friendly name instead of a raw URL path. The
+   path itself still drives the link and shows on hover.
+--------------------------------------------------------- */
+const LABELS = {
+  "/": "Homepage",
+  "Others": "Other pages",
+  "/about-electrogas/": "About Electrogas",
+  "/air-carts-air-trailers/": "Air Carts & Trailers",
+  "/benzene-landing-page/": "Benzene Landing Page",
+  "/calibration-equipment/": "Calibration Equipment",
+  "/contact-us/": "Contact Us",
+  "/current-promotions/": "Current Promotions",
+  "/electrogas-mini-catalogue/": "Mini Catalogue",
+  "/fall-protection-equipment/": "Fall Protection Equipment",
+  "/faqs/": "FAQs",
+  "/fixed-gas-detection/": "Fixed Gas Detection",
+  "/gas-detection/": "Gas Detection",
+  "/gas-detection/area-gas-detection/": "Area Gas Detection",
+  "/gas-detection/gas-detection-tubes/": "Gas Detection Tubes",
+  "/gas-detection/multi-gas-detection/": "Multi-Gas Detectors",
+  "/gas-detection/single-gas-detection/": "Single-Gas Detectors",
+  "/gas-detection/specialty-gas-detection/": "Specialty Gas Detection",
+  "/join-our-team/": "Join Our Team",
+  "/online-training/": "Online Training",
+  "/products/": "Products",
+  "/project/04-series/": "04 Series",
+  "/project/altair-2x/": "Altair 2X",
+  "/project/altair-4xr/": "Altair 4XR",
+  "/project/arearae-plus/": "AreaRAE Plus",
+  "/project/bw-clip-series/": "BW Clip Series",
+  "/project/bw-flex-5/": "BW Flex 5",
+  "/project/bw-flex/": "BW Flex",
+  "/project/g6-single-gas/": "G6 Single-Gas",
+  "/project/g7-c-x/": "G7c",
+  "/project/g8-portable-gas-detector/": "G8 Portable",
+  "/project/gasalert-microclip-series/": "GasAlert MicroClip",
+  "/project/gx-3r/": "GX-3R",
+  "/project/gx-force/": "GX Force",
+  "/project/multi-gas-clip-infrared/": "Multi-Gas Clip (Infrared)",
+  "/project/multi-gas-clip-pump-infrared/": "Multi-Gas Clip (Pump IR)",
+  "/project/multi-gas-clip-simple-plus/": "Multi-Gas Clip (Simple+)",
+  "/project/multi-gas-clip-simple/": "Multi-Gas Clip (Simple)",
+  "/project/pac-6500/": "Pac 6500",
+  "/project/pac-8000/": "Pac 8000",
+  "/project/single-gas-clip/": "Single-Gas Clip",
+  "/project/toxirae-pro-pid/": "ToxiRAE Pro PID",
+  "/project/x-am-2500/": "X-am 2500",
+  "/project/x-am-5000/": "X-am 5000",
+  "/project/x-am-5600/": "X-am 5600",
+  "/rental-equipment/": "Rental Equipment",
+  "/rental-equipment/gas-detection-rentals/": "Gas Detection Rentals",
+  "/respiratory-protection/": "Respiratory Protection",
+  "/self-contained-breathing-apparatus/": "Breathing Apparatus (SCBA)",
+  "/service/": "Service",
+};
+function friendly(path){ return LABELS[path] || path; }
+
+/* ---------------------------------------------------------
+   1d. SIMPLIFY THE DEEP BRANCHES
+   The three expanded sections originally listed 14–21
+   individual pages each — accurate, but a lot to take in at
+   a glance. This keeps each branch's top pages visible and
+   folds the long tail into "Other pages," the same rollup
+   idea the data already uses elsewhere. Raise the number to
+   show more detail, or remove the call below to see everything.
+--------------------------------------------------------- */
+const MAX_CHILDREN_SHOWN = 6;
+function simplifyBranches(node){
+  if (!node.children) return;
+  node.children.forEach(simplifyBranches);
+  const real = node.children.filter(c => c.name !== 'Others');
+  const others = node.children.find(c => c.name === 'Others');
+  if (real.length > MAX_CHILDREN_SHOWN){
+    const sorted = [...real].sort((a, b) => b.value - a.value);
+    const kept = sorted.slice(0, MAX_CHILDREN_SHOWN);
+    const folded = sorted.slice(MAX_CHILDREN_SHOWN).reduce((s, c) => s + c.value, 0) + (others ? others.value : 0);
+    node.children = [...kept, { name: 'Others', value: folded }];
+  }
+}
+tree.children.forEach(simplifyBranches);
+
+/* ---------------------------------------------------------
    2. CATEGORY COLORS (semantic, not decorative)
 --------------------------------------------------------- */
 const COLORS = { home:'#B8C0CC', product:'#E3A857', company:'#4EC0C9', conversion:'#D9694F', other:'#6E7580' };
@@ -279,7 +374,7 @@ let idc = 0;
 
 function addNode(t, parent){
   const cat = categorize(t.name);
-  const node = { id: idc++, name: t.name, count: t.value, cat, color: COLORS[cat], url: t.name === '/' ? SITE + '/' : urlFor(t.name) };
+  const node = { id: idc++, name: t.name, label: friendly(t.name), count: t.value, cat, color: COLORS[cat], url: t.name === '/' ? SITE + '/' : urlFor(t.name) };
   nodes.push(node);
   if (parent){
     links.push({ source: parent.id, target: node.id, value: Math.sqrt(t.value), count: t.value });
@@ -298,10 +393,10 @@ const trackedNext = level1.reduce((s,c)=>s+c.value,0);
 const expandedBranches = level1.filter(c=>c.children).length;
 const statsEl = document.getElementById('stats');
 [
-  [totalSessions.toLocaleString(), 'Sessions at /'],
-  [trackedNext.toLocaleString(), 'Continued to a next page'],
-  [level1.length, 'Distinct next pages'],
-  [expandedBranches, 'Traced a 3rd page'],
+  [totalSessions.toLocaleString(), 'Total visits'],
+  [trackedNext.toLocaleString(), 'Went on to another page'],
+  [level1.length, 'Different pages visited next'],
+  [expandedBranches, 'Sections shown in full detail'],
 ].forEach(([n,l])=>{
   const d = document.createElement('div');
   d.className = 'stat';
@@ -312,8 +407,8 @@ const statsEl = document.getElementById('stats');
 /* ---------------------------------------------------------
    5. LAYOUT
 --------------------------------------------------------- */
-const MARGIN = { top: 46, right: 430, bottom: 40, left: 26 };
-const WIDTH = 1600;
+const MARGIN = { top: 46, right: 260, bottom: 40, left: 26 };
+const WIDTH = 1360;
 
 // count nodes per depth (needs a first pass) to size height
 const depthCounts = {};
@@ -323,7 +418,7 @@ function passDepth(t, depth){
 }
 passDepth(tree, 0);
 const maxCol = Math.max(...Object.values(depthCounts));
-const HEIGHT = Math.max(1400, maxCol * 46 + 200);
+const HEIGHT = Math.max(800, maxCol * 52 + 200);
 
 const svg = d3.select('#chart')
   .attr('width', WIDTH)
@@ -334,7 +429,7 @@ const sankeyGen = d3.sankey()
   .nodeId(d => d.id)
   .nodeAlign(d3.sankeyLeft)
   .nodeWidth(16)
-  .nodePadding(7)
+  .nodePadding(10)
   .extent([[MARGIN.left, MARGIN.top], [WIDTH - MARGIN.right, HEIGHT - MARGIN.bottom]]);
 
 const graph = sankeyGen({
@@ -401,10 +496,10 @@ nodeG.append('text')
   .attr('class', d => 'lbl-name' + (d.depth >= 2 ? ' dim' : ''))
   .attr('x', d => d.x1 + 7)
   .attr('y', d => (d.y0 + d.y1) / 2 - (d.depth <= 1 ? 3 : 1) )
-  .attr('font-size', d => d.depth === 0 ? 13.5 : d.depth === 1 ? 12 : 10)
+  .attr('font-size', d => d.depth === 0 ? 14 : d.depth === 1 ? 12.5 : 11.5)
   .attr('font-weight', d => d.depth === 0 ? 600 : 500)
   .attr('dominant-baseline', 'middle')
-  .text(d => d.depth === 0 ? 'All sessions' : d.name)
+  .text(d => d.depth === 0 ? 'All sessions' : d.label)
   .filter(d => !!d.url)
   .append('tspan')
     .attr('class','link-glyph')
@@ -474,13 +569,14 @@ nodeG.select('rect')
     highlightNodes.add(d);
     dim(highlightLinks, highlightNodes);
     const parentLink = ancestry[0];
-    const pct = parentLink ? ((d.count / parentLink.source.count) * 100).toFixed(1) + '% of ' + (parentLink.source.depth===0?'all sessions':parentLink.source.name) : null;
+    const pct = parentLink ? ((d.count / parentLink.source.count) * 100).toFixed(1) + '% of ' + (parentLink.source.depth===0?'all sessions':parentLink.source.label) : null;
     const linkLine = d.url
       ? `<div class="t-meta" style="color:var(--cyan);margin-top:4px;">↗ click to open page</div>`
       : d.name === 'Others'
-        ? `<div class="t-meta" style="margin-top:4px;">rollup of several low-volume paths — no single page</div>`
-        : `<div class="t-meta" style="margin-top:4px;">not in the current sitemap — likely retired</div>`;
-    showTip(`<div class="t-path">${d.depth===0?'/':d.name}</div><div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> sessions${pct?' · '+pct:''}</div>${linkLine}`, evt);
+        ? `<div class="t-meta" style="margin-top:4px;">a group of smaller pages, not one single page</div>`
+        : `<div class="t-meta" style="margin-top:4px;">no longer a live page on the site</div>`;
+    const path = d.depth === 0 ? '' : `<div class="t-path-sub">${d.name}</div>`;
+    showTip(`<div class="t-path">${d.depth===0?'Homepage':d.label}</div>${path}<div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> visits${pct?' · '+pct:''}</div>${linkLine}`, evt);
   })
   .on('mouseleave', () => { resetDim(); hideTip(); });
 
@@ -491,7 +587,8 @@ linkSel
     const highlightLinks = new Set([d, ...ancestry]);
     const highlightNodes = collectNodes(highlightLinks);
     dim(highlightLinks, highlightNodes);
-    showTip(`<div class="t-path">${d.source.depth===0?'/':d.source.name} → ${d.target.name}</div><div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> sessions</div>`, evt);
+    const from = d.source.depth === 0 ? 'Homepage' : d.source.label;
+    showTip(`<div class="t-path">${from} → ${d.target.label}</div><div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> visits</div>`, evt);
   })
   .on('mouseleave', () => { resetDim(); hideTip(); });
 
@@ -512,7 +609,7 @@ level1Nodes.forEach(n => {
   const item = document.createElement('div');
   item.className = 'side-nav-item';
   item.dataset.id = n.id;
-  item.innerHTML = `<span class="dot" style="background:${n.color}"></span><span class="nm">${n.name === '/' ? 'All sessions' : n.name}</span><span class="c">${n.count.toLocaleString()}</span>`;
+  item.innerHTML = `<span class="dot" style="background:${n.color}"></span><span class="nm">${n.name === '/' ? 'All sessions' : n.label}</span><span class="c">${n.count.toLocaleString()}</span>`;
   item.addEventListener('click', () => {
     window.scrollTo({ top: absolutePageY(n) - Math.min(160, window.innerHeight * 0.3), behavior: 'smooth' });
   });
