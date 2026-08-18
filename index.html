@@ -71,11 +71,11 @@
     .side-nav{position:static;width:100%;flex:none;max-height:240px;border-right:none;border-bottom:1px solid var(--line);}
   }
 
-  .chart-scroll{overflow-x:auto;overflow-y:visible;cursor:grab;background-color:#FFFFFF;background-image:
+  .chart-scroll{overflow-x:auto;overflow-y:visible;cursor:-webkit-grab;cursor:grab;background-color:#FFFFFF;background-image:
     linear-gradient(to right, rgba(27,32,39,0.035) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(27,32,39,0.035) 1px, transparent 1px);
     background-size:32px 32px;}
-  .chart-scroll.grabbing, .chart-scroll.grabbing *{cursor:grabbing !important;}
+  .chart-scroll.grabbing, .chart-scroll.grabbing *{cursor:-webkit-grabbing !important;cursor:grabbing !important;}
   .chart-scroll::-webkit-scrollbar{height:10px;}
   .chart-scroll::-webkit-scrollbar-track{background:var(--panel);}
   .chart-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
