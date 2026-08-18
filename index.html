@@ -53,6 +53,24 @@
   .panel-head h2{font-family:var(--font-display);font-size:15px;margin:0;font-weight:500;}
   .panel-head .hint{font-size:11.5px;color:var(--text-dimmer);font-family:var(--font-mono);}
 
+  .panel-body{display:flex;align-items:flex-start;}
+
+  .side-nav{flex:0 0 216px;width:216px;position:sticky;top:0;align-self:flex-start;max-height:100vh;overflow-y:auto;padding:16px 14px 20px;border-right:1px solid var(--line);background:var(--panel);z-index:6;}
+  .side-nav h3{margin:0 0 10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dimmer);}
+  .side-nav-item{display:flex;align-items:center;gap:7px;padding:6px 7px;margin:0 -7px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-dim);transition:background .12s ease,color .12s ease;}
+  .side-nav-item:hover, .side-nav-item.active{background:#EEF1F4;color:var(--text);}
+  .side-nav-item .dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px;}
+  .side-nav-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .side-nav-item .c{font-family:var(--font-mono);font-size:10px;color:var(--text-dimmer);flex:0 0 auto;}
+
+  .col-sticky{position:sticky;top:0;z-index:4;height:30px;background:#FFFFFF;border-bottom:1px solid var(--line);}
+  .col-sticky span{position:absolute;bottom:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dimmer);white-space:nowrap;}
+
+  @media (max-width:760px){
+    .panel-body{flex-direction:column;}
+    .side-nav{position:static;width:100%;flex:none;max-height:240px;border-right:none;border-bottom:1px solid var(--line);}
+  }
+
   .chart-scroll{overflow-x:auto;overflow-y:visible;background-color:#FFFFFF;background-image:
     linear-gradient(to right, rgba(27,32,39,0.035) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(27,32,39,0.035) 1px, transparent 1px);
@@ -65,7 +83,6 @@
   .node-rect{stroke:rgba(27,32,39,0.18);stroke-width:.75;transition:opacity .15s ease;}
   .link-glyph{fill:var(--cyan);}
   .link-path{fill:none;cursor:pointer;transition:opacity .15s ease, stroke-width .15s ease;}
-  .col-header{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;fill:var(--text-dimmer);text-transform:uppercase;}
   .lbl-name{font-family:var(--font-body);fill:var(--text);pointer-events:none;}
   .lbl-name.dim{fill:var(--text-dim);}
   .lbl-val{font-family:var(--font-mono);fill:var(--text-dimmer);pointer-events:none;}
@@ -107,8 +124,15 @@
       <h2>Session flow, three pages deep</h2>
       <span class="hint">bar thickness = √(sessions) for readability · hover for counts · click a page to open it</span>
     </div>
-    <div class="chart-scroll">
-      <svg id="chart"></svg>
+    <div class="panel-body">
+      <nav class="side-nav" id="sideNav" aria-label="Jump to entry page">
+        <h3>Entry pages · click to jump</h3>
+        <div class="side-nav-list" id="sideNavList"></div>
+      </nav>
+      <div class="chart-scroll">
+        <div class="col-sticky" id="colSticky"></div>
+        <svg id="chart"></svg>
+      </div>
     </div>
   </div>
 
@@ -321,17 +345,20 @@ graph.nodes.forEach(n => { if (n.y1 - n.y0 < 2) { const m=(n.y0+n.y1)/2; n.y0=m-
 graph.links.forEach(l => { if (l.width < 1.2) l.width = 1.2; });
 
 /* ---------------------------------------------------------
-   6. COLUMN HEADERS
+   6. COLUMN HEADERS — rendered into the sticky bar above the
+   chart (see #colSticky) rather than inside the SVG, so they
+   stay visible no matter how far down the page you've scrolled.
 --------------------------------------------------------- */
 const byDepth = d3.group(graph.nodes, d => d.depth);
 const headerLabels = ['Entry page', 'Next page', 'Then'];
+const colSticky = document.getElementById('colSticky');
+colSticky.style.width = WIDTH + 'px';
 byDepth.forEach((list, depth) => {
   const x = d3.min(list, d => d.x0);
-  svg.append('text')
-    .attr('class','col-header')
-    .attr('x', x)
-    .attr('y', MARGIN.top - 20)
-    .text(headerLabels[depth] || '');
+  const span = document.createElement('span');
+  span.style.left = x + 'px';
+  span.textContent = headerLabels[depth] || '';
+  colSticky.appendChild(span);
 });
 
 /* ---------------------------------------------------------
@@ -419,14 +446,32 @@ function resetDim(){
   nodeG.selectAll('rect').attr('fill-opacity', d => d.depth === 0 ? 1 : 0.94);
 }
 
+// Walk backward from a node to the root, collecting every link on the way —
+// so hovering something two or three pages deep highlights the whole path
+// that led there, not just the last hop.
+function incomingLink(node){ return graph.links.find(l => l.target === node); }
+function ancestorChainLinks(node){
+  const chain = [];
+  let inc = incomingLink(node);
+  while (inc){ chain.push(inc); inc = incomingLink(inc.source); }
+  return chain;
+}
+function collectNodes(linkSet){
+  const ns = new Set();
+  linkSet.forEach(l => { ns.add(l.source); ns.add(l.target); });
+  return ns;
+}
+
 nodeG.select('rect')
   .on('mousemove', (evt,d) => moveTip(evt))
   .on('mouseenter', (evt, d) => {
-    const connected = new Set(graph.links.filter(l => l.source === d || l.target === d));
-    const connNodes = new Set([d]);
-    connected.forEach(l => { connNodes.add(l.source); connNodes.add(l.target); });
-    dim(connected, connNodes);
-    const parentLink = graph.links.find(l => l.target === d);
+    const ancestry = ancestorChainLinks(d);              // everything before it
+    const nextHop = graph.links.filter(l => l.source === d); // where it leads next
+    const highlightLinks = new Set([...ancestry, ...nextHop]);
+    const highlightNodes = collectNodes(highlightLinks);
+    highlightNodes.add(d);
+    dim(highlightLinks, highlightNodes);
+    const parentLink = ancestry[0];
     const pct = parentLink ? ((d.count / parentLink.source.count) * 100).toFixed(1) + '% of ' + (parentLink.source.depth===0?'all sessions':parentLink.source.name) : null;
     const linkLine = d.url
       ? `<div class="t-meta" style="color:var(--cyan);margin-top:4px;">↗ click to open page</div>`
@@ -440,10 +485,52 @@ nodeG.select('rect')
 linkSel
   .on('mousemove', (evt,d) => moveTip(evt))
   .on('mouseenter', (evt, d) => {
-    dim(new Set([d]), new Set([d.source, d.target]));
+    const ancestry = ancestorChainLinks(d.source);       // everything upstream of this ribbon
+    const highlightLinks = new Set([d, ...ancestry]);
+    const highlightNodes = collectNodes(highlightLinks);
+    dim(highlightLinks, highlightNodes);
     showTip(`<div class="t-path">${d.source.depth===0?'/':d.source.name} → ${d.target.name}</div><div class="t-meta"><span class="t-val">${d.count.toLocaleString()}</span> sessions</div>`, evt);
   })
   .on('mouseleave', () => { resetDim(); hideTip(); });
+
+/* ---------------------------------------------------------
+   10. LEFT SIDE-NAV — lists every entry page, stays pinned to
+   the top of the viewport (position: sticky) as you scroll
+   down through the tall diagram, so it's always reachable.
+--------------------------------------------------------- */
+function absolutePageY(node){
+  const svgTop = document.getElementById('chart').getBoundingClientRect().top + window.scrollY;
+  return svgTop + (node.y0 + node.y1) / 2;
+}
+
+const sideNavList = document.getElementById('sideNavList');
+const level1Nodes = graph.nodes.filter(n => n.depth === 1);
+
+level1Nodes.forEach(n => {
+  const item = document.createElement('div');
+  item.className = 'side-nav-item';
+  item.dataset.id = n.id;
+  item.innerHTML = `<span class="dot" style="background:${n.color}"></span><span class="nm">${n.name === '/' ? 'All sessions' : n.name}</span><span class="c">${n.count.toLocaleString()}</span>`;
+  item.addEventListener('click', () => {
+    window.scrollTo({ top: absolutePageY(n) - Math.min(160, window.innerHeight * 0.3), behavior: 'smooth' });
+  });
+  sideNavList.appendChild(item);
+});
+
+const sideNavItems = sideNavList.querySelectorAll('.side-nav-item');
+function updateActiveSideNav(){
+  const probeY = window.scrollY + window.innerHeight * 0.35;
+  let closest = null, closestDist = Infinity;
+  level1Nodes.forEach(n => {
+    const dist = Math.abs(absolutePageY(n) - probeY);
+    if (dist < closestDist){ closestDist = dist; closest = n; }
+  });
+  sideNavItems.forEach(el => el.classList.toggle('active', closest && Number(el.dataset.id) === closest.id));
+}
+updateActiveSideNav();
+window.addEventListener('scroll', updateActiveSideNav, { passive: true });
+window.addEventListener('resize', updateActiveSideNav);
+
 </script>
 </body>
 </html>
