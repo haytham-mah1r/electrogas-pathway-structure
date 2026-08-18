@@ -480,7 +480,7 @@ const nodeG = svg.append('g').selectAll('g')
   .data(graph.nodes)
   .join('g')
   .style('cursor', d => d.url ? 'pointer' : 'grab')
-  .on('click', (evt, d) => { if (d.url) window.open(d.url, '_blank', 'noopener'); });
+  .on('click', (evt, d) => { lockHighlight(d); if (d.url) window.open(d.url, '_blank', 'noopener'); });
 
 nodeG.append('rect')
   .attr('class','node-rect')
@@ -539,6 +539,10 @@ function dim(exceptLinks, exceptNodes){
   nodeG.selectAll('rect').attr('fill-opacity', d => exceptNodes.has(d) ? 1 : 0.18);
 }
 function resetDim(){
+  // If a page is "locked" (clicked from the side list), falling back
+  // here — e.g. after a mouse hover elsewhere ends — should restore
+  // that lock rather than clearing it early.
+  if (lockedLinks && lockedNodes){ dim(lockedLinks, lockedNodes); return; }
   linkSel.attr('stroke-opacity', 0.42);
   nodeG.selectAll('rect').attr('fill-opacity', d => d.depth === 0 ? 1 : 0.94);
 }
@@ -557,6 +561,37 @@ function collectNodes(linkSet){
   const ns = new Set();
   linkSet.forEach(l => { ns.add(l.source); ns.add(l.target); });
   return ns;
+}
+
+/* ---------------------------------------------------------
+   9b. HIGHLIGHT LOCK — clicking a page (from the side list or
+   the chart itself) isolates its path — itself, everything
+   before it, and its immediate next step — for 10 seconds,
+   then the diagram fades back to showing everything. Picking
+   another page while the countdown is running swaps to that
+   page's path instead and restarts the 10 seconds.
+--------------------------------------------------------- */
+let lockedLinks = null, lockedNodes = null, lockTimer = null;
+
+function pathHighlightFor(d){
+  const ancestry = ancestorChainLinks(d);
+  const nextHop = graph.links.filter(l => l.source === d);
+  const highlightLinks = new Set([...ancestry, ...nextHop]);
+  const highlightNodes = collectNodes(highlightLinks);
+  highlightNodes.add(d);
+  return { highlightLinks, highlightNodes };
+}
+
+function lockHighlight(d){
+  if (lockTimer) clearTimeout(lockTimer);
+  const { highlightLinks, highlightNodes } = pathHighlightFor(d);
+  lockedLinks = highlightLinks;
+  lockedNodes = highlightNodes;
+  dim(lockedLinks, lockedNodes);
+  lockTimer = setTimeout(() => {
+    lockedLinks = null; lockedNodes = null; lockTimer = null;
+    resetDim();
+  }, 10000);
 }
 
 nodeG.select('rect')
@@ -611,6 +646,7 @@ level1Nodes.forEach(n => {
   item.dataset.id = n.id;
   item.innerHTML = `<span class="dot" style="background:${n.color}"></span><span class="nm">${n.name === '/' ? 'All sessions' : n.label}</span><span class="c">${n.count.toLocaleString()}</span>`;
   item.addEventListener('click', () => {
+    lockHighlight(n);
     window.scrollTo({ top: absolutePageY(n) - Math.min(160, window.innerHeight * 0.3), behavior: 'smooth' });
   });
   sideNavList.appendChild(item);
