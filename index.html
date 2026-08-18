@@ -71,18 +71,20 @@
     .side-nav{position:static;width:100%;flex:none;max-height:240px;border-right:none;border-bottom:1px solid var(--line);}
   }
 
-  .chart-scroll{overflow-x:auto;overflow-y:visible;background-color:#FFFFFF;background-image:
+  .chart-scroll{overflow-x:auto;overflow-y:visible;cursor:grab;background-color:#FFFFFF;background-image:
     linear-gradient(to right, rgba(27,32,39,0.035) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(27,32,39,0.035) 1px, transparent 1px);
     background-size:32px 32px;}
+  .chart-scroll.grabbing, .chart-scroll.grabbing *{cursor:grabbing !important;}
   .chart-scroll::-webkit-scrollbar{height:10px;}
   .chart-scroll::-webkit-scrollbar-track{background:var(--panel);}
   .chart-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  body.panning{user-select:none;}
 
   svg{display:block;}
   .node-rect{stroke:rgba(27,32,39,0.18);stroke-width:.75;transition:opacity .15s ease;}
   .link-glyph{fill:var(--cyan);}
-  .link-path{fill:none;cursor:pointer;transition:opacity .15s ease, stroke-width .15s ease;}
+  .link-path{fill:none;transition:opacity .15s ease, stroke-width .15s ease;}
   .lbl-name{font-family:var(--font-body);fill:var(--text);pointer-events:none;}
   .lbl-name.dim{fill:var(--text-dim);}
   .lbl-val{font-family:var(--font-mono);fill:var(--text-dimmer);pointer-events:none;}
@@ -122,7 +124,7 @@
   <div class="panel">
     <div class="panel-head">
       <h2>Session flow, three pages deep</h2>
-      <span class="hint">bar thickness = √(sessions) for readability · hover for counts · click a page to open it</span>
+      <span class="hint">bar thickness = √(sessions) · hover for counts · click to open a page · click + drag to pan</span>
     </div>
     <div class="panel-body">
       <nav class="side-nav" id="sideNav" aria-label="Jump to entry page">
@@ -382,7 +384,7 @@ const linkSel = svg.append('g').attr('fill','none')
 const nodeG = svg.append('g').selectAll('g')
   .data(graph.nodes)
   .join('g')
-  .style('cursor', d => d.url ? 'pointer' : 'default')
+  .style('cursor', d => d.url ? 'pointer' : 'grab')
   .on('click', (evt, d) => { if (d.url) window.open(d.url, '_blank', 'noopener'); });
 
 nodeG.append('rect')
@@ -530,6 +532,69 @@ function updateActiveSideNav(){
 updateActiveSideNav();
 window.addEventListener('scroll', updateActiveSideNav, { passive: true });
 window.addEventListener('resize', updateActiveSideNav);
+
+/* ---------------------------------------------------------
+   11. CLICK-AND-DRAG PANNING
+   A Figma-style hand tool: click, hold, and drag anywhere on
+   the chart to pan it in any direction (pans the horizontal
+   scroller and the page's vertical scroll together). Mouse
+   only — touch devices keep their native scroll gestures.
+   A small movement threshold means an ordinary click (e.g. to
+   open a linked page) still works normally.
+--------------------------------------------------------- */
+(function enablePanning(){
+  const scrollEl = document.querySelector('.chart-scroll');
+  const THRESHOLD = 6;
+  let isDown = false, dragged = false, suppressClick = false;
+  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  let pendingDx = 0, pendingDy = 0, rafId = null;
+
+  function applyPan(){
+    scrollEl.scrollLeft = startLeft - pendingDx;
+    window.scrollTo(window.scrollX, startTop - pendingDy);
+    rafId = null;
+  }
+
+  scrollEl.addEventListener('pointerdown', (evt) => {
+    if (evt.pointerType === 'touch' || evt.button !== 0) return;
+    isDown = true;
+    dragged = false;
+    startX = evt.clientX;
+    startY = evt.clientY;
+    startLeft = scrollEl.scrollLeft;
+    startTop = window.scrollY;
+    scrollEl.classList.add('grabbing');
+    document.body.classList.add('panning');
+  });
+
+  window.addEventListener('pointermove', (evt) => {
+    if (!isDown) return;
+    const dx = evt.clientX - startX;
+    const dy = evt.clientY - startY;
+    if (!dragged && (Math.abs(dx) > THRESHOLD || Math.abs(dy) > THRESHOLD)) dragged = true;
+    if (dragged){
+      pendingDx = dx; pendingDy = dy;
+      if (rafId === null) rafId = requestAnimationFrame(applyPan);
+    }
+  });
+
+  function endDrag(){
+    if (!isDown) return;
+    isDown = false;
+    scrollEl.classList.remove('grabbing');
+    document.body.classList.remove('panning');
+    if (dragged) suppressClick = true;
+  }
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+
+  // A drag that ends over a linked node still fires a native
+  // click — swallow it here so panning never accidentally
+  // opens a page.
+  scrollEl.addEventListener('click', (evt) => {
+    if (suppressClick){ evt.stopPropagation(); evt.preventDefault(); suppressClick = false; }
+  }, true);
+})();
 
 </script>
 </body>
