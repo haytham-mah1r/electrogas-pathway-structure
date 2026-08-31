@@ -38,7 +38,13 @@
   h1{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,3.4vw,38px);margin:0 0 10px;letter-spacing:-0.01em;}
   .sub{font-family:var(--font-body);color:var(--text-dim);font-size:14.5px;line-height:1.6;max-width:720px;margin:0 0 10px;}
 
-  .data-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dimmer);margin:0 0 18px;padding:4px 10px 4px 8px;border:1px solid var(--line);border-radius:20px;width:fit-content;}
+  .period-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 18px;}
+  .data-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dimmer);margin:0;padding:4px 10px 4px 8px;border:1px solid var(--line);border-radius:20px;width:fit-content;}
+  .period-toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .period-btn{font-family:var(--font-mono);font-size:11.5px;padding:5px 12px;background:#fff;border:none;border-right:1px solid var(--line);color:var(--text-dim);cursor:pointer;transition:background .15s ease,color .15s ease;}
+  .period-btn:last-child{border-right:none;}
+  .period-btn:hover{background:var(--bg);}
+  .period-btn.active{background:var(--root);color:#fff;}
   .data-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--text-dimmer);flex:none;}
   .data-status.is-live{color:#1E8A6E;border-color:#BFE3D4;background:#F1FAF6;}
   .data-status.is-live::before{background:#1E8A6E;}
@@ -126,8 +132,13 @@
     <p class="eyebrow">Visitor Journey</p>
     <h1>Electrogas.com — Where People Go on the Site</h1>
     <p class="sub">Starting from the homepage, this shows the pages visitors land on next, and — for the three most-visited sections — the page after that.</p>
-    <p class="data-status" id="dataStatus">Loading…</p>
-    <div class="stats" id="stats"></div>
+    <div class="period-row">
+      <p class="data-status" id="dataStatus">Loading…</p>
+      <div class="period-toggle" role="group" aria-label="Reporting period">
+        <button class="period-btn" data-months="0" type="button">This month</button>
+        <button class="period-btn" data-months="1" type="button">Last month</button>
+      </div>
+    </div>
     <div class="legend">
       <span class="legend-item"><span class="swatch" style="background:var(--root)"></span>Homepage</span>
       <span class="legend-item"><span class="swatch" style="background:var(--amber)"></span>Product &amp; equipment pages</span>
@@ -169,7 +180,7 @@
 /* ---------------------------------------------------------
    1. DATA
    This is the fallback shown if a live feed isn't configured
-   (or is unreachable) — see LIVE_DATA_URL and loadAndRender()
+   (or is unreachable) — see LIVE_DATA_URL and loadPeriod()
    near the bottom of this script. Everything below builds the
    same chart from whichever tree it's handed.
 --------------------------------------------------------- */
@@ -262,10 +273,27 @@ const FALLBACK_TREE = {
 /* ---------------------------------------------------------
    Everything below builds and wires up the chart from a tree
    object shaped like FALLBACK_TREE above. It's wrapped in one
-   function so it can run once with live GA4 data, or fall back
-   to the example above — see loadAndRender() at the very end.
+   function so it can be re-run whenever the period toggle picks
+   a different month — see loadPeriod() at the very end.
 --------------------------------------------------------- */
+let activeCleanup = null; // torn down at the start of every renderChart() call
+
 function renderChart(tree){
+  // A previous call may still have window-level listeners attached
+  // (panning, scroll-tracking for the side-nav) — remove those before
+  // wiring up a new set, or switching periods would double them up.
+  if (typeof activeCleanup === 'function') activeCleanup();
+  const cleanupFns = [];
+  function onWindow(type, fn, opts){
+    window.addEventListener(type, fn, opts);
+    cleanupFns.push(function(){ window.removeEventListener(type, fn, opts); });
+  }
+  activeCleanup = function(){ cleanupFns.forEach(function(fn){ fn(); }); };
+
+  // Clear anything the previous render drew before building the new one.
+  d3.select('#chart').selectAll('*').remove();
+  document.getElementById('sideNavList').innerHTML = '';
+  document.getElementById('colSticky').innerHTML = '';
 
 /* ---------------------------------------------------------
    1b. LIVE URL RESOLUTION
@@ -410,27 +438,7 @@ function addNode(t, parent){
 addNode(tree, null);
 
 /* ---------------------------------------------------------
-   4. STATS STRIP
---------------------------------------------------------- */
-const level1 = tree.children;
-const totalSessions = tree.value;
-const trackedNext = level1.reduce((s,c)=>s+c.value,0);
-const expandedBranches = level1.filter(c=>c.children).length;
-const statsEl = document.getElementById('stats');
-[
-  [totalSessions.toLocaleString(), 'Total visits'],
-  [trackedNext.toLocaleString(), 'Went on to another page'],
-  [level1.length, 'Different pages visited next'],
-  [expandedBranches, 'Sections shown in full detail'],
-].forEach(([n,l])=>{
-  const d = document.createElement('div');
-  d.className = 'stat';
-  d.innerHTML = `<div class="n">${n}</div><div class="l">${l}</div>`;
-  statsEl.appendChild(d);
-});
-
-/* ---------------------------------------------------------
-   5. LAYOUT
+   4. LAYOUT
 --------------------------------------------------------- */
 const MARGIN = { top: 46, right: 260, bottom: 40, left: 26 };
 const WIDTH = 1360;
@@ -467,7 +475,7 @@ graph.nodes.forEach(n => { if (n.y1 - n.y0 < 2) { const m=(n.y0+n.y1)/2; n.y0=m-
 graph.links.forEach(l => { if (l.width < 1.2) l.width = 1.2; });
 
 /* ---------------------------------------------------------
-   6. COLUMN HEADERS — rendered into the sticky bar above the
+   5. COLUMN HEADERS — rendered into the sticky bar above the
    chart (see #colSticky) rather than inside the SVG, so they
    stay visible no matter how far down the page you've scrolled.
 --------------------------------------------------------- */
@@ -484,7 +492,7 @@ byDepth.forEach((list, depth) => {
 });
 
 /* ---------------------------------------------------------
-   7. LINKS
+   6. LINKS
 --------------------------------------------------------- */
 const linkGen = d3.sankeyLinkHorizontal();
 
@@ -499,7 +507,7 @@ const linkSel = svg.append('g').attr('fill','none')
   .attr('stroke-opacity', 0.42);
 
 /* ---------------------------------------------------------
-   8. NODES
+   7. NODES
 --------------------------------------------------------- */
 const nodeG = svg.append('g').selectAll('g')
   .data(graph.nodes)
@@ -541,7 +549,7 @@ nodeG.append('text')
   .text(d => d.count.toLocaleString() + (d.depth === 0 ? ' sessions' : ''));
 
 /* ---------------------------------------------------------
-   9. INTERACTION
+   8. INTERACTION
 --------------------------------------------------------- */
 const tooltip = document.getElementById('tooltip');
 function showTip(html, evt){
@@ -653,7 +661,7 @@ linkSel
   .on('mouseleave', () => { resetDim(); hideTip(); });
 
 /* ---------------------------------------------------------
-   10. LEFT SIDE-NAV — lists every entry page, stays pinned to
+   9. LEFT SIDE-NAV — lists every entry page, stays pinned to
    the top of the viewport (position: sticky) as you scroll
    down through the tall diagram, so it's always reachable.
 --------------------------------------------------------- */
@@ -688,11 +696,11 @@ function updateActiveSideNav(){
   sideNavItems.forEach(el => el.classList.toggle('active', closest && Number(el.dataset.id) === closest.id));
 }
 updateActiveSideNav();
-window.addEventListener('scroll', updateActiveSideNav, { passive: true });
-window.addEventListener('resize', updateActiveSideNav);
+onWindow('scroll', updateActiveSideNav, { passive: true });
+onWindow('resize', updateActiveSideNav);
 
 /* ---------------------------------------------------------
-   11. CLICK-AND-DRAG PANNING
+   10. CLICK-AND-DRAG PANNING
    A Figma-style hand tool: click, hold, and drag anywhere on
    the chart to pan it in any direction (pans the horizontal
    scroller and the page's vertical scroll together). Mouse
@@ -725,7 +733,7 @@ window.addEventListener('resize', updateActiveSideNav);
     document.body.classList.add('panning');
   });
 
-  window.addEventListener('pointermove', (evt) => {
+  onWindow('pointermove', (evt) => {
     if (!isDown) return;
     const dx = evt.clientX - startX;
     const dy = evt.clientY - startY;
@@ -743,8 +751,8 @@ window.addEventListener('resize', updateActiveSideNav);
     document.body.classList.remove('panning');
     if (dragged) suppressClick = true;
   }
-  window.addEventListener('pointerup', endDrag);
-  window.addEventListener('pointercancel', endDrag);
+  onWindow('pointerup', endDrag);
+  onWindow('pointercancel', endDrag);
 
   // A drag that ends over a linked node still fires a native
   // click — swallow it here so panning never accidentally
@@ -757,12 +765,14 @@ window.addEventListener('resize', updateActiveSideNav);
 } // end renderChart()
 
 /* ---------------------------------------------------------
-   12. LIVE DATA BOOTSTRAP
+   11. LIVE DATA + PERIOD TOGGLE
    Paste the /exec URL from your deployed Apps Script web app
    below. Leave it blank to always show the example data above.
    On any failure (not deployed yet, wrong URL, GA4 unreachable,
-   property has no traffic this month, etc.) this quietly falls
+   property has no traffic that month, etc.) this quietly falls
    back to FALLBACK_TREE so the report never shows broken/empty.
+   The This month / Last month buttons re-run this with a
+   different ?months= value — see the Apps Script's doGet().
 --------------------------------------------------------- */
 const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwLnBoPTfzAMu0HtlXw8zmXRih-y_gwA6MQ6QilUGaX_6mRlI4nuvbxPmuoDNiNa-Q_Lg/exec";
 
@@ -774,7 +784,15 @@ function setDataStatus(text, ok){
   el.classList.toggle('is-fallback', ok === false);
 }
 
-async function loadAndRender(){
+function setActivePeriodButton(monthsOffset){
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.months) === monthsOffset);
+  });
+}
+
+async function loadPeriod(monthsOffset){
+  setActivePeriodButton(monthsOffset);
+
   if (!LIVE_DATA_URL){
     setDataStatus('Showing example data — add your Apps Script URL to go live', false);
     renderChart(FALLBACK_TREE);
@@ -782,12 +800,13 @@ async function loadAndRender(){
   }
   setDataStatus('Loading live data from Google Analytics…', null);
   try {
-    const res = await fetch(LIVE_DATA_URL, { cache: 'no-store' });
+    const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
+    const res = await fetch(LIVE_DATA_URL + sep + 'months=' + monthsOffset, { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || data.ok === false || !data.tree) throw new Error((data && data.error) || 'Malformed response');
     const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setDataStatus('Live · ' + (data.month || 'this month') + ' · updated ' + stamp, true);
+    setDataStatus('Live · ' + (data.month || 'this period') + ' · updated ' + stamp, true);
     renderChart(data.tree);
   } catch (err){
     console.warn('Live GA4 feed unavailable, showing example data instead:', err);
@@ -795,7 +814,12 @@ async function loadAndRender(){
     renderChart(FALLBACK_TREE);
   }
 }
-loadAndRender();
+
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', () => loadPeriod(Number(btn.dataset.months)));
+});
+
+loadPeriod(0); // 0 = this month, on first load
 </script>
 </body>
 </html>
