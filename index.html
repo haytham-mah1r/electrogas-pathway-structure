@@ -36,7 +36,14 @@
   header{border-bottom:1px solid var(--line);padding:36px 0 22px;}
   .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;margin:0 0 10px;}
   h1{font-family:var(--font-display);font-weight:700;font-size:clamp(24px,3.4vw,38px);margin:0 0 10px;letter-spacing:-0.01em;}
-  .sub{font-family:var(--font-body);color:var(--text-dim);font-size:14.5px;line-height:1.6;max-width:720px;margin:0 0 22px;}
+  .sub{font-family:var(--font-body);color:var(--text-dim);font-size:14.5px;line-height:1.6;max-width:720px;margin:0 0 10px;}
+
+  .data-status{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dimmer);margin:0 0 18px;padding:4px 10px 4px 8px;border:1px solid var(--line);border-radius:20px;width:fit-content;}
+  .data-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--text-dimmer);flex:none;}
+  .data-status.is-live{color:#1E8A6E;border-color:#BFE3D4;background:#F1FAF6;}
+  .data-status.is-live::before{background:#1E8A6E;}
+  .data-status.is-fallback{color:var(--amber);border-color:#F0DCB8;background:#FBF5EA;}
+  .data-status.is-fallback::before{background:var(--amber);}
 
   .stats{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:fit-content;}
   .stat{padding:12px 22px;border-right:1px solid var(--line);}
@@ -116,6 +123,11 @@
 
 <div class="wrap">
   <header>
+    <p class="eyebrow">Visitor Journey</p>
+    <h1>Electrogas.com — Where People Go on the Site</h1>
+    <p class="sub">Starting from the homepage, this shows the pages visitors land on next, and — for the three most-visited sections — the page after that.</p>
+    <p class="data-status" id="dataStatus">Loading…</p>
+    <div class="stats" id="stats"></div>
     <div class="legend">
       <span class="legend-item"><span class="swatch" style="background:var(--root)"></span>Homepage</span>
       <span class="legend-item"><span class="swatch" style="background:var(--amber)"></span>Product &amp; equipment pages</span>
@@ -156,85 +168,104 @@
 <script>
 /* ---------------------------------------------------------
    1. DATA
-   Reconstructed from the supplied Path Exploration screenshots.
-   Edit this tree to correct or extend the data — the chart
-   below rebuilds itself entirely from it.
+   This is the fallback shown if a live feed isn't configured
+   (or is unreachable) — see LIVE_DATA_URL and loadAndRender()
+   near the bottom of this script. Everything below builds the
+   same chart from whichever tree it's handed.
 --------------------------------------------------------- */
-const tree = {
-  name: "/", value: 1082,
+const FALLBACK_TREE = {
+  name: "/", value: 3315,
   children: [
-    { name: "/contact-us/", value: 96 },
-    { name: "/gas-detection/multi-gas-detection/", value: 44, children: [
-      { name: "/project/gasalert-microclip-series/", value: 10 },
-      { name: "/", value: 3 },
-      { name: "/contact-us/", value: 3 },
-      { name: "/project/g8-portable-gas-detector/", value: 3 },
-      { name: "/project/multi-gas-clip-infrared/", value: 2 },
-      { name: "/project/multi-gas-clip-simple-plus/", value: 2 },
-      { name: "/project/x-am-5600/", value: 2 },
-      { name: "/calibration-equipment/", value: 1 },
-      { name: "/electrogas-mini-catalogue/", value: 1 },
-      { name: "/gas-detection/single-gas-detection/", value: 1 },
-      { name: "/project/altair-4xr/", value: 1 },
-      { name: "/project/bw-flex/", value: 1 },
-      { name: "/project/multi-gas-clip-simple/", value: 1 },
-      { name: "/project/x-am-5000/", value: 1 },
-      { name: "Others", value: 9 },
-    ]},
-    { name: "/about-electrogas/", value: 18, children: [
-      { name: "/", value: 3 },
+    { name: "/contact-us/", value: 290 },
+    { name: "/gas-detection/multi-gas-detection/", value: 131, children: [
+      { name: "/project/gasalert-microclip-series/", value: 27 },
+      { name: "/", value: 13 },
+      { name: "/project/multi-gas-clip-simple-plus/", value: 11 },
+      { name: "/project/altair-4xr/", value: 9 },
+      { name: "/project/g8-portable-gas-detector/", value: 8 },
+      { name: "/project/multi-gas-clip-infrared/", value: 7 },
+      { name: "/project/bw-flex/", value: 5 },
+      { name: "/project/g7-c-x/", value: 4 },
+      { name: "/project/gx-3r/", value: 4 },
+      { name: "/project/gx-force/", value: 4 },
+      { name: "/project/x-am-5000/", value: 4 },
+      { name: "/electrogas-mini-catalogue/", value: 3 },
+      { name: "/project/multi-gas-clip-pump-infrared/", value: 3 },
+      { name: "/project/multi-gas-clip-simple/", value: 3 },
+      { name: "/calibration-equipment/", value: 2 },
       { name: "/contact-us/", value: 2 },
-      { name: "/service/", value: 2 },
-      { name: "/air-carts-air-trailers/", value: 1 },
-      { name: "/fixed-gas-detection/", value: 1 },
-      { name: "/join-our-team/", value: 1 },
-      { name: "/products/", value: 1 },
-      { name: "/project/bw-flex-5/", value: 1 },
-      { name: "/rental-equipment/", value: 1 },
-      { name: "/rental-equipment/gas-detection-rentals/", value: 1 },
-      { name: "Others", value: 4 },
+      { name: "/gas-detection/single-gas-detection/", value: 2 },
+      { name: "/gas-detection/specialty-gas-detection/", value: 2 },
+      { name: "/project/x-am-2500/", value: 2 },
+      { name: "/project/x-am-5600/", value: 2 },
+      { name: "Others", value: 14 },
     ]},
-    { name: "/gas-detection/single-gas-detection/", value: 15, children: [
-      { name: "/", value: 3 },
-      { name: "/gas-detection/multi-gas-detection/", value: 3 },
-      { name: "/about-electrogas/", value: 1 },
-      { name: "/contact-us/", value: 1 },
+    { name: "/gas-detection/single-gas-detection/", value: 66, children: [
+      { name: "/", value: 15 },
+      { name: "/project/bw-clip-series/", value: 9 },
+      { name: "/gas-detection/multi-gas-detection/", value: 8 },
+      { name: "/fixed-gas-detection/", value: 4 },
+      { name: "/project/pac-6500/", value: 4 },
+      { name: "/contact-us/", value: 3 },
+      { name: "/electrogas-mini-catalogue/", value: 2 },
+      { name: "/gas-detection/gas-detection-tubes/", value: 2 },
+      { name: "/project/g6-single-gas/", value: 2 },
+      { name: "/air-carts-air-trailers/", value: 1 },
+      { name: "/calibration-equipment/", value: 1 },
       { name: "/gas-detection/", value: 1 },
       { name: "/gas-detection/area-gas-detection/", value: 1 },
+      { name: "/gas-detection/specialty-gas-detection/", value: 1 },
+      { name: "/project/04-series/", value: 1 },
+      { name: "/project/altair-2x/", value: 1 },
       { name: "/project/arearae-plus/", value: 1 },
-      { name: "/project/bw-clip-series/", value: 1 },
-      { name: "/project/pac-8500/", value: 1 },
+      { name: "/project/pac-8000/", value: 1 },
       { name: "/project/single-gas-clip/", value: 1 },
-      { name: "Others", value: 1 },
+      { name: "/project/toxirae-pro-pid/", value: 1 },
+      { name: "Others", value: 6 },
     ]},
-    { name: "/gas-detection/", value: 14 },
-    { name: "/service/", value: 13 },
-    { name: "/calibration-equipment/", value: 12 },
-    { name: "/join-our-team/", value: 12, children: [
-      { name: "/", value: 6 },
-      { name: "/calibration-equipment/", value: 1 },
-      { name: "/contact-us/", value: 1 },
-      { name: "/gas-detection/single-gas-detection/", value: 1, children: [
-        { name: "/", value: 1 }
-      ]},
-      { name: "/latest-news/", value: 1 },
-      { name: "Others", value: 2 },
+    { name: "/about-electrogas/", value: 64, children: [
+      { name: "/", value: 17 },
+      { name: "/contact-us/", value: 11 },
+      { name: "/join-our-team/", value: 7 },
+      { name: "/service/", value: 5 },
+      { name: "/fixed-gas-detection/", value: 2 },
+      { name: "/gas-detection/multi-gas-detection/", value: 2 },
+      { name: "/products/", value: 2 },
+      { name: "/air-carts-air-trailers/", value: 1 },
+      { name: "/current-promotions/", value: 1 },
+      { name: "/faqs/", value: 1 },
+      { name: "/online-training/", value: 1 },
+      { name: "/project/bw-flex-5/", value: 1 },
+      { name: "/rental-equipment/gas-detection-rentals/", value: 1 },
+      { name: "Others", value: 12 },
     ]},
-    { name: "/electrogas-mini-catalogue/", value: 11 },
-    { name: "/products/", value: 10 },
-    { name: "/fall-protection-equipment/", value: 9 },
-    { name: "/rental-equipment/gas-detection-rentals/", value: 8 },
-    { name: "/gas-detection/area-gas-detection/", value: 7 },
-    { name: "/gas-detection/specialty-gas-detection/", value: 5 },
-    { name: "/gas-detection/gas-detection-tubes/", value: 4 },
-    { name: "/self-contained-breathing-apparatus/", value: 4 },
-    { name: "/respiratory-protection/", value: 3 },
-    { name: "/fixed-gas-detection/", value: 2 },
-    { name: "/rental-equipment/", value: 2 },
-    { name: "/benzene-landing-page/", value: 1 },
-    { name: "Others", value: 47 }
+    { name: "/join-our-team/", value: 45 },
+    { name: "/rental-equipment/gas-detection-rentals/", value: 45 },
+    { name: "/calibration-equipment/", value: 36 },
+    { name: "/gas-detection/", value: 33 },
+    { name: "/service/", value: 28 },
+    { name: "/electrogas-mini-catalogue/", value: 26 },
+    { name: "/gas-detection/area-gas-detection/", value: 19 },
+    { name: "/products/", value: 19 },
+    { name: "/fall-protection-equipment/", value: 17 },
+    { name: "/fixed-gas-detection/", value: 16 },
+    { name: "/self-contained-breathing-apparatus/", value: 16 },
+    { name: "/gas-detection/specialty-gas-detection/", value: 14 },
+    { name: "/respiratory-protection/", value: 14 },
+    { name: "/current-promotions/", value: 12 },
+    { name: "/rental-equipment/", value: 10 },
+    { name: "/benzene-landing-page/", value: 7 },
+    { name: "Others", value: 110 },
   ]
 };
+
+/* ---------------------------------------------------------
+   Everything below builds and wires up the chart from a tree
+   object shaped like FALLBACK_TREE above. It's wrapped in one
+   function so it can run once with live GA4 data, or fall back
+   to the example above — see loadAndRender() at the very end.
+--------------------------------------------------------- */
+function renderChart(tree){
 
 /* ---------------------------------------------------------
    1b. LIVE URL RESOLUTION
@@ -275,7 +306,6 @@ const LABELS = {
   "/gas-detection/single-gas-detection/": "Single-Gas Detectors",
   "/gas-detection/specialty-gas-detection/": "Specialty Gas Detection",
   "/join-our-team/": "Join Our Team",
-  "/latest-news/": "Latest News",
   "/online-training/": "Online Training",
   "/products/": "Products",
   "/project/04-series/": "04 Series",
@@ -297,7 +327,6 @@ const LABELS = {
   "/project/multi-gas-clip-simple/": "Multi-Gas Clip (Simple)",
   "/project/pac-6500/": "Pac 6500",
   "/project/pac-8000/": "Pac 8000",
-  "/project/pac-8500/": "Pac 8500",
   "/project/single-gas-clip/": "Single-Gas Clip",
   "/project/toxirae-pro-pid/": "ToxiRAE Pro PID",
   "/project/x-am-2500/": "X-am 2500",
@@ -309,7 +338,15 @@ const LABELS = {
   "/self-contained-breathing-apparatus/": "Breathing Apparatus (SCBA)",
   "/service/": "Service",
 };
-function friendly(path){ return LABELS[path] || path; }
+function friendly(path){
+  if (LABELS[path]) return LABELS[path];
+  if (path === '/') return 'Homepage';
+  if (path === 'Others') return 'Other pages';
+  // Not in the curated list (e.g. a page added to the site since) —
+  // turn the last URL segment into a readable title as a fallback.
+  const seg = path.replace(/\/$/, '').split('/').filter(Boolean).pop() || path;
+  return seg.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 
 /* ---------------------------------------------------------
    1d. SIMPLIFY THE DEEP BRANCHES
@@ -340,7 +377,7 @@ tree.children.forEach(simplifyBranches);
 --------------------------------------------------------- */
 const COLORS = { home:'#B8C0CC', product:'#E3A857', company:'#4EC0C9', conversion:'#D9694F', other:'#6E7580' };
 const PRODUCT = ['/project','/gas-detection','/fixed-gas-detection','/self-contained-breathi','/respiratory-protection','/fall-protection-equip','/calibration-equipment','/rental-equipment','/electrogas-mini-catal','/products','/air-carts-air-trailers'];
-const COMPANY = ['/about-electrogas','/join-our-team','/faqs','/service','/online-training','/latest-news'];
+const COMPANY = ['/about-electrogas','/join-our-team','/faqs','/service','/online-training'];
 const CONVERSION = ['/contact-us','/current-promotions','/benzene-landing-page'];
 
 function categorize(path){
@@ -373,7 +410,27 @@ function addNode(t, parent){
 addNode(tree, null);
 
 /* ---------------------------------------------------------
-   4. LAYOUT
+   4. STATS STRIP
+--------------------------------------------------------- */
+const level1 = tree.children;
+const totalSessions = tree.value;
+const trackedNext = level1.reduce((s,c)=>s+c.value,0);
+const expandedBranches = level1.filter(c=>c.children).length;
+const statsEl = document.getElementById('stats');
+[
+  [totalSessions.toLocaleString(), 'Total visits'],
+  [trackedNext.toLocaleString(), 'Went on to another page'],
+  [level1.length, 'Different pages visited next'],
+  [expandedBranches, 'Sections shown in full detail'],
+].forEach(([n,l])=>{
+  const d = document.createElement('div');
+  d.className = 'stat';
+  d.innerHTML = `<div class="n">${n}</div><div class="l">${l}</div>`;
+  statsEl.appendChild(d);
+});
+
+/* ---------------------------------------------------------
+   5. LAYOUT
 --------------------------------------------------------- */
 const MARGIN = { top: 46, right: 260, bottom: 40, left: 26 };
 const WIDTH = 1360;
@@ -410,7 +467,7 @@ graph.nodes.forEach(n => { if (n.y1 - n.y0 < 2) { const m=(n.y0+n.y1)/2; n.y0=m-
 graph.links.forEach(l => { if (l.width < 1.2) l.width = 1.2; });
 
 /* ---------------------------------------------------------
-   5. COLUMN HEADERS — rendered into the sticky bar above the
+   6. COLUMN HEADERS — rendered into the sticky bar above the
    chart (see #colSticky) rather than inside the SVG, so they
    stay visible no matter how far down the page you've scrolled.
 --------------------------------------------------------- */
@@ -427,7 +484,7 @@ byDepth.forEach((list, depth) => {
 });
 
 /* ---------------------------------------------------------
-   6. LINKS
+   7. LINKS
 --------------------------------------------------------- */
 const linkGen = d3.sankeyLinkHorizontal();
 
@@ -442,7 +499,7 @@ const linkSel = svg.append('g').attr('fill','none')
   .attr('stroke-opacity', 0.42);
 
 /* ---------------------------------------------------------
-   7. NODES
+   8. NODES
 --------------------------------------------------------- */
 const nodeG = svg.append('g').selectAll('g')
   .data(graph.nodes)
@@ -484,7 +541,7 @@ nodeG.append('text')
   .text(d => d.count.toLocaleString() + (d.depth === 0 ? ' sessions' : ''));
 
 /* ---------------------------------------------------------
-   8. INTERACTION
+   9. INTERACTION
 --------------------------------------------------------- */
 const tooltip = document.getElementById('tooltip');
 function showTip(html, evt){
@@ -532,7 +589,7 @@ function collectNodes(linkSet){
 }
 
 /* ---------------------------------------------------------
-   8b. HIGHLIGHT LOCK — clicking a page (from the side list or
+   9b. HIGHLIGHT LOCK — clicking a page (from the side list or
    the chart itself) isolates its path — itself, everything
    before it, and its immediate next step — for 10 seconds,
    then the diagram fades back to showing everything. Picking
@@ -596,7 +653,7 @@ linkSel
   .on('mouseleave', () => { resetDim(); hideTip(); });
 
 /* ---------------------------------------------------------
-   9. LEFT SIDE-NAV — lists every entry page, stays pinned to
+   10. LEFT SIDE-NAV — lists every entry page, stays pinned to
    the top of the viewport (position: sticky) as you scroll
    down through the tall diagram, so it's always reachable.
 --------------------------------------------------------- */
@@ -635,7 +692,7 @@ window.addEventListener('scroll', updateActiveSideNav, { passive: true });
 window.addEventListener('resize', updateActiveSideNav);
 
 /* ---------------------------------------------------------
-   10. CLICK-AND-DRAG PANNING
+   11. CLICK-AND-DRAG PANNING
    A Figma-style hand tool: click, hold, and drag anywhere on
    the chart to pan it in any direction (pans the horizontal
    scroller and the page's vertical scroll together). Mouse
@@ -697,6 +754,48 @@ window.addEventListener('resize', updateActiveSideNav);
   }, true);
 })();
 
+} // end renderChart()
+
+/* ---------------------------------------------------------
+   12. LIVE DATA BOOTSTRAP
+   Paste the /exec URL from your deployed Apps Script web app
+   below. Leave it blank to always show the example data above.
+   On any failure (not deployed yet, wrong URL, GA4 unreachable,
+   property has no traffic this month, etc.) this quietly falls
+   back to FALLBACK_TREE so the report never shows broken/empty.
+--------------------------------------------------------- */
+const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwLnBoPTfzAMu0HtlXw8zmXRih-y_gwA6MQ6QilUGaX_6mRlI4nuvbxPmuoDNiNa-Q_Lg/exec";
+
+function setDataStatus(text, ok){
+  const el = document.getElementById('dataStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-live', ok === true);
+  el.classList.toggle('is-fallback', ok === false);
+}
+
+async function loadAndRender(){
+  if (!LIVE_DATA_URL){
+    setDataStatus('Showing example data — add your Apps Script URL to go live', false);
+    renderChart(FALLBACK_TREE);
+    return;
+  }
+  setDataStatus('Loading live data from Google Analytics…', null);
+  try {
+    const res = await fetch(LIVE_DATA_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || data.ok === false || !data.tree) throw new Error((data && data.error) || 'Malformed response');
+    const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setDataStatus('Live · ' + (data.month || 'this month') + ' · updated ' + stamp, true);
+    renderChart(data.tree);
+  } catch (err){
+    console.warn('Live GA4 feed unavailable, showing example data instead:', err);
+    setDataStatus('Live feed unavailable right now — showing example data', false);
+    renderChart(FALLBACK_TREE);
+  }
+}
+loadAndRender();
 </script>
 </body>
 </html>
