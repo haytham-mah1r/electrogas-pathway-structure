@@ -437,8 +437,8 @@ addNode(tree, null);
 /* ---------------------------------------------------------
    4. LAYOUT
 --------------------------------------------------------- */
-const MARGIN = { top: 46, right: 260, bottom: 40, left: 26 };
-const WIDTH = 1360;
+const MARGIN = { top: 30, right: 220, bottom: 30, left: 20 };
+const WIDTH = 1000;
 
 // count nodes per depth (needs a first pass) to size height
 const depthCounts = {};
@@ -448,7 +448,7 @@ function passDepth(t, depth){
 }
 passDepth(tree, 0);
 const maxCol = Math.max(...Object.values(depthCounts));
-const HEIGHT = Math.max(800, maxCol * 52 + 200);
+const HEIGHT = Math.max(500, maxCol * 35 + 80);
 
 const svg = d3.select('#chart')
   .attr('width', WIDTH)
@@ -458,8 +458,8 @@ const svg = d3.select('#chart')
 const sankeyGen = d3.sankey()
   .nodeId(d => d.id)
   .nodeAlign(d3.sankeyLeft)
-  .nodeWidth(16)
-  .nodePadding(10)
+  .nodeWidth(12)
+  .nodePadding(6)
   .extent([[MARGIN.left, MARGIN.top], [WIDTH - MARGIN.right, HEIGHT - MARGIN.bottom]]);
 
 const graph = sankeyGen({
