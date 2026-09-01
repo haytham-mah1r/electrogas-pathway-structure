@@ -816,7 +816,7 @@ document.querySelectorAll('.period-btn').forEach(btn => {
   btn.addEventListener('click', () => loadPeriod(Number(btn.dataset.months)));
 });
 
-loadPeriod(0); // 0 = this month, on first load
+loadPeriod(1); // 1 = last month, on first load — this month has little/no data right at the start of a new month
 </script>
 </body>
 </html>
