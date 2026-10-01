@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electrogas · Site Navigation Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F7F9;
+    --panel:#FFFFFF;
+    --line:#E2E5EA;
+    --line-soft:#EDEFF3;
+    --text:#1B2027;
+    --text-dim:#525A67;
+    --text-dimmer:#7C8494;
+    --amber:#C6862E;
+    --cyan:#137F89;
+    --rust:#BE4A2C;
+    --root:#2E3644;
+    --event:#7C5CBF;
+    --key-event:#B8860B;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  body{padding-bottom:56px;}
+  .wrap{max-width:1680px;margin:0 auto;padding:0 24px;}
+
+  header{border-bottom:1px solid var(--line);padding:14px 0 12px;}
+  .period-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
+  .data-status{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:9.5px;color:var(--text-dimmer);margin:0;padding:2px 8px 2px 6px;border:1px solid var(--line);border-radius:20px;line-height:1.6;}
+  .data-status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--text-dimmer);flex:none;}
+  .data-status.is-live{color:#1E8A6E;border-color:#BFE3D4;background:#F1FAF6;}
+  .data-status.is-live::before{background:#1E8A6E;}
+  .data-status.is-fallback{color:var(--amber);border-color:#F0DCB8;background:#FBF5EA;}
+  .data-status.is-fallback::before{background:var(--amber);}
+  .data-status.is-busy{color:var(--text-dim);}
+  .data-status.is-busy::before{background:none;width:9px;height:9px;border:1.5px solid var(--line);border-top-color:var(--cyan);animation:spin .7s linear infinite;}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spinner{width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;flex:none;}
+  .panel-wait{position:absolute;inset:0;z-index:8;display:none;align-items:center;justify-content:center;gap:9px;
+    background:rgba(255,255,255,0.66);backdrop-filter:blur(1px);font-size:12.5px;color:var(--text-dim);}
+  .panel.busy .panel-wait{display:flex;}
+  .period-btn{position:relative;}
+
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;}
+  .seg button{font-family:var(--font-mono);font-size:9.5px;padding:4px 10px;line-height:1.6;background:#fff;border:none;border-right:1px solid var(--line);color:var(--text-dim);cursor:pointer;transition:background .15s ease,color .15s ease;}
+  .seg button:last-child{border-right:none;}
+  .seg button:hover{background:var(--bg);}
+  .seg button.active{background:var(--root);color:#fff;}
+  .view-toggle{margin-left:auto;}
+  .view-toggle button.active{background:var(--event);color:#fff;}
+
+  .stats{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:fit-content;background:#fff;}
+  .stat{padding:10px 20px;border-right:1px solid var(--line);}
+  .stat:last-child{border-right:none;}
+  .stat .n{font-family:var(--font-mono);font-size:19px;font-weight:500;color:var(--text);}
+  .stat .l{font-size:10.5px;color:var(--text-dimmer);margin-top:2px;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim);}
+  .swatch{width:7px;height:7px;border-radius:2px;display:inline-block;}
+
+  .panel{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;}
+  .panel-head h2{font-family:var(--font-display);font-size:15px;margin:0;font-weight:500;}
+  .panel-head .hint{font-size:11.5px;color:var(--text-dimmer);}
+  .head-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+  .seg.zoom button{min-width:34px;font-size:11px;padding:3px 8px;}
+  .seg.zoom button.level{min-width:52px;font-family:var(--font-mono);font-size:9.5px;}
+
+  /* ---------- picker + single chart ---------- */
+  .split{display:flex;align-items:flex-start;}
+  .picker{flex:0 0 244px;width:244px;border-right:1px solid var(--line);padding:14px;position:sticky;top:0;max-height:100vh;overflow-y:auto;background:var(--panel);z-index:3;}
+  .picker h3{margin:0 0 3px;font-family:var(--font-display);font-size:12.5px;font-weight:500;}
+  .picker .note{margin:0 0 10px;font-size:11px;color:var(--text-dimmer);line-height:1.45;}
+  .picker-search{width:100%;font-family:var(--font-body);font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;color:var(--text);background:#fff;}
+  .picker-actions{display:flex;gap:6px;margin:8px 0 6px;flex-wrap:wrap;}
+  .mini-btn{font-family:var(--font-mono);font-size:9.5px;padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--text-dim);cursor:pointer;}
+  .mini-btn:hover{background:var(--bg);}
+  .pick{display:flex;align-items:center;gap:8px;padding:5px 6px;margin:0 -6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-dim);}
+  .pick:hover{background:#EEF1F4;color:var(--text);}
+  .pick.on{color:var(--text);font-weight:500;}
+  .pick input{margin:0;accent-color:var(--cyan);cursor:pointer;flex:none;}
+  .pick .dot{width:6px;height:6px;border-radius:50%;flex:none;}
+  .pick .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pick .c{font-family:var(--font-mono);font-size:10px;color:var(--text-dimmer);flex:none;}
+  .picker-note{font-size:11px;color:var(--text-dimmer);padding:8px 0 0;line-height:1.45;}
+
+  .chart-col{flex:1;min-width:0;}
+  .col-heads{position:relative;height:26px;border-bottom:1px solid var(--line-soft);overflow:hidden;}
+  .col-heads .inner{position:relative;height:100%;}
+  .col-heads span{position:absolute;bottom:6px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;color:var(--text-dimmer);white-space:nowrap;}
+  .chart-scroll{overflow-x:auto;padding:0 14px 14px;cursor:-webkit-grab;cursor:grab;}
+  .chart-scroll.grabbing, .chart-scroll.grabbing *{cursor:-webkit-grabbing !important;cursor:grabbing !important;}
+  .chart-empty{cursor:auto;}
+  body.panning{user-select:none;}
+  .chart-scroll::-webkit-scrollbar{height:9px;}
+  .chart-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  svg#chart{display:block;}
+  #chart .ribbon{transition:fill-opacity .12s ease;}
+  #chart .node-hit{fill:transparent;}
+  #chart .n-nm{font-family:var(--font-body);font-size:12px;fill:var(--text);}
+  #chart .n-nm.root{font-size:14px;font-weight:600;}
+  #chart .n-val{font-family:var(--font-mono);font-size:10.5px;fill:var(--text-dimmer);}
+  #chart .n-chev{font-family:var(--font-mono);font-size:9px;fill:var(--text-dimmer);}
+  #chart .n-ext{font-family:var(--font-mono);font-size:10px;fill:var(--cyan);cursor:pointer;}
+  #chart .n-nm, #chart .n-val, #chart .n-chev{pointer-events:none;}
+  #chart g.node.can-open{cursor:pointer;}
+  #chart g.node.can-open:hover .n-nm{fill:var(--cyan);}
+  #chart g.node.faded{opacity:.28;}
+
+  .chart-empty{padding:44px 20px;text-align:center;color:var(--text-dim);font-size:13px;}
+  .chart-empty p{margin:0 0 12px;}
+  .chart-empty button{font-family:var(--font-body);font-size:12px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;color:var(--text);}
+  .chart-empty button:hover{background:var(--bg);}
+
+  /* ---------- events table ---------- */
+  .ev-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line-soft);}
+  .ev-tools input[type=search]{font-family:var(--font-body);font-size:12px;padding:5px 9px;border:1px solid var(--line);border-radius:6px;min-width:190px;}
+  .mini-btn.on{background:var(--root);color:#fff;border-color:var(--root);}
+  .ev-main{flex:1;min-width:0;padding:0 0 14px;}
+  .ev-summary{margin:0;padding:12px 16px;font-size:12.5px;color:var(--text-dim);border-bottom:1px solid var(--line-soft);}
+  .ev-summary b{font-weight:600;color:var(--text);font-family:var(--font-mono);font-size:13px;}
+  .ev-summary .star{color:var(--key-event);}
+  .pick .star{color:var(--key-event);font-size:9px;flex:none;}
+  .picker-group{margin:14px 0 4px;font-family:var(--font-mono);font-size:9px;letter-spacing:.07em;color:var(--text-dimmer);}
+  .picker-group:first-child{margin-top:4px;}
+
+  table.ev{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.ev th{text-align:left;font-family:var(--font-mono);font-size:9px;letter-spacing:.07em;color:var(--text-dimmer);font-weight:400;
+    padding:9px 14px;border-bottom:1px solid var(--line);background:#FBFCFD;position:sticky;top:0;z-index:2;white-space:nowrap;}
+  table.ev th[data-sort]{cursor:pointer;}
+  table.ev th[data-sort]:hover{color:var(--text-dim);}
+  table.ev th .arrow{opacity:.55;margin-left:2px;}
+  table.ev td{padding:9px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  table.ev td.num{font-family:var(--font-mono);font-size:11.5px;text-align:right;white-space:nowrap;color:var(--text-dim);}
+  table.ev td.num.lead{color:var(--text);}
+  table.ev td.key{font-family:var(--font-mono);font-size:11.5px;text-align:right;white-space:nowrap;color:var(--key-event);}
+  table.ev td.key .none{color:var(--line);}
+
+  tr.group-row{cursor:pointer;background:#fff;}
+  tr.group-row:hover{background:#F7F9FA;}
+  tr.group-row td{border-bottom:1px solid var(--line);}
+  tr.group-row.open td{border-bottom-color:var(--line-soft);}
+  tr.group-row .lead-cell{display:flex;align-items:center;gap:9px;min-width:0;}
+  tr.group-row .caret{font-size:8px;color:var(--text-dimmer);width:8px;flex:none;transition:transform .14s ease;display:inline-block;}
+  tr.group-row.open .caret{transform:rotate(90deg);}
+  tr.group-row .caret.empty{visibility:hidden;}
+  tr.group-row .dot{width:8px;height:8px;border-radius:2px;flex:none;}
+  tr.group-row .nm{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tr.group-row .path{font-family:var(--font-mono);font-size:9.5px;color:var(--text-dimmer);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  tr.group-row .sub{font-size:10.5px;color:var(--text-dimmer);display:block;}
+  .keystar{color:var(--key-event);font-size:10px;margin-left:5px;}
+
+  tr.child-row{background:#FCFDFE;}
+  tr.child-row td{color:var(--text-dim);border-bottom:1px solid var(--line-soft);}
+  tr.child-row .child-cell{padding-left:31px;position:relative;}
+  tr.child-row .child-cell::before{content:"";position:absolute;left:14px;top:50%;width:8px;height:1px;background:var(--line);}
+  tr.child-row .path{font-family:var(--font-mono);font-size:9.5px;color:var(--text-dimmer);display:block;}
+
+  .step{font-size:11px;color:var(--text-dim);white-space:nowrap;}
+  .step.off{color:var(--line);font-family:var(--font-mono);}
+  .barcell{width:112px;}
+  .barcell .track{height:4px;background:var(--line-soft);border-radius:2px;overflow:hidden;}
+  .barcell .fill{height:4px;border-radius:2px;}
+  .ev-actions{display:flex;gap:4px;justify-content:flex-end;opacity:0;transition:opacity .12s ease;}
+  tr:hover .ev-actions, tr:focus-within .ev-actions{opacity:1;}
+  @media (hover:none){ .ev-actions{opacity:1;} }
+  .ev-actions button, .ev-actions a{font-size:10.5px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--text-dim);
+    padding:2px 8px;cursor:pointer;text-decoration:none;white-space:nowrap;font-family:var(--font-body);}
+  .ev-actions button:hover, .ev-actions a:hover{background:var(--bg);color:var(--text);}
+  .ev-empty{padding:44px 20px;text-align:center;color:var(--text-dimmer);font-size:13px;}
+  .ev-empty button{margin-top:10px;font-family:var(--font-body);font-size:12px;padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;color:var(--text);}
+  .table-scroll{max-height:72vh;overflow:auto;}
+  .ev-empty{padding:40px 20px;text-align:center;color:var(--text-dimmer);font-size:13px;}
+
+  #tooltip{position:fixed;pointer-events:none;z-index:50;background:#fff;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;padding:8px 12px;font-size:12.5px;line-height:1.5;box-shadow:0 12px 30px rgba(27,32,39,0.14);opacity:0;transform:translateY(4px);transition:opacity .12s ease,transform .12s ease;max-width:320px;}
+  #tooltip.show{opacity:1;transform:translateY(0);}
+  #tooltip .t-path{font-weight:600;}
+  #tooltip .t-sub{font-family:var(--font-mono);font-size:10px;color:var(--text-dimmer);margin-top:1px;word-break:break-all;}
+  #tooltip .t-meta{color:var(--text-dim);margin-top:3px;}
+  #tooltip .t-val{color:var(--cyan);font-family:var(--font-mono);}
+
+  footer{max-width:1680px;margin:22px auto 0;padding:0 24px;color:var(--text-dimmer);font-size:12px;line-height:1.7;}
+  footer p{margin:0 0 8px;}
+  footer summary{cursor:pointer;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;list-style:none;}
+  footer summary::-webkit-details-marker{display:none;}
+  footer summary::before{content:"+ ";color:var(--cyan);}
+  footer details[open] summary::before{content:"– ";}
+
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+
+  @media (max-width:900px){
+    .split{flex-direction:column;}
+    .picker{position:static;width:100%;flex:none;max-height:240px;border-right:none;border-bottom:1px solid var(--line);}
+    .chart-col{width:100%;}
+    .barcell{display:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;scroll-behavior:auto !important;}
+    /* the spinner still turns — it's the only thing telling you the
+       report is working, so it just turns more slowly */
+    .spinner, .data-status.is-busy::before{animation-duration:1.8s;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="period-row">
+      <p class="data-status" id="dataStatus">Loading…</p>
+      <div class="seg" role="group" aria-label="Reporting period">
+        <button class="period-btn" data-mode="month" data-value="0" type="button">This month</button>
+        <button class="period-btn" data-mode="month" data-value="1" type="button">Last month</button>
+        <button class="period-btn" data-mode="range" data-value="6" type="button">Last 6 months</button>
+      </div>
+      <div class="seg view-toggle" role="group" aria-label="View">
+        <button class="view-btn" data-view="pathway" type="button">Pathway</button>
+        <button class="view-btn" data-view="events" type="button">Events</button>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="legend" id="legend">
+      <span class="legend-item"><span class="swatch" style="background:#E3A857"></span>Product &amp; equipment pages</span>
+      <span class="legend-item"><span class="swatch" style="background:#4EC0C9"></span>Company &amp; resource pages</span>
+      <span class="legend-item"><span class="swatch" style="background:#D9694F"></span>Contact &amp; promo pages</span>
+      <span class="legend-item"><span class="swatch" style="background:#6E7580"></span>Other pages</span>
+    </div>
+  </header>
+
+  <!-- ============ PATHWAY ============ -->
+  <div class="panel" id="pathwayPanel">
+    <div class="panel-head">
+      <h2>Every session, and where it went</h2>
+      <div class="head-right">
+        <div class="seg zoom" role="group" aria-label="Chart size">
+          <button id="zoomOut" type="button" title="Smaller">−</button>
+          <button id="zoomFit" class="level" type="button" title="Back to the size that fits the space">100%</button>
+          <button id="zoomIn" type="button" title="Bigger">+</button>
+        </div>
+        <span class="hint">tick a starting page to add its branch · click any page to open the next step · drag the chart to move around</span>
+      </div>
+    </div>
+    <div class="panel-wait" id="waitPathway" role="status" aria-live="polite"><span class="spinner"></span><span>Fetching this period from Google Analytics…</span></div>
+    <div class="split">
+      <nav class="picker" id="picker" aria-label="Choose starting pages">
+        <h3>Pages sessions start on</h3>
+        <p class="note">Tick one to add its branch to the diagram. Everything stays on the same chart.</p>
+        <input class="picker-search" id="pickerSearch" type="search" placeholder="Find a page…" aria-label="Find a page">
+        <div class="picker-actions">
+          <button class="mini-btn" id="pickTop" type="button">Top 5</button>
+          <button class="mini-btn" id="pickAll" type="button">All</button>
+          <button class="mini-btn" id="pickClear" type="button">Clear</button>
+        </div>
+        <div id="pickerList"></div>
+      </nav>
+      <div class="chart-col">
+        <div class="col-heads" id="colHeads"></div>
+        <div class="chart-scroll" id="chartScroll">
+          <svg id="chart"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EVENTS ============ -->
+  <div class="panel" id="eventsPanel" style="display:none;">
+    <div class="panel-wait" id="waitEvents" role="status" aria-live="polite"><span class="spinner"></span><span>Fetching this period from Google Analytics…</span></div>
+    <div class="panel-head">
+      <h2>What happened, and where</h2>
+      <div class="head-right">
+        <div class="seg" role="group" aria-label="Arrange rows">
+          <button id="evByPage" class="active" type="button">By page</button>
+          <button id="evByEvent" type="button">By event</button>
+        </div>
+        <span class="hint">click a row to open it · automatic page views and scrolls are left out</span>
+      </div>
+    </div>
+    <div class="split">
+      <nav class="picker" id="evFilters" aria-label="Filter events">
+        <h3>Narrow it down</h3>
+        <p class="note">Tick the events you care about. With none ticked you see everything.</p>
+        <input class="picker-search" id="evSearch" type="search" placeholder="Find an event or page…" aria-label="Find an event or page">
+        <div class="picker-actions">
+          <button class="mini-btn" id="evKeyBtn" type="button" title="Show only the events marked as Key Events in Google Analytics">Key events</button>
+          <button class="mini-btn" id="evClear" type="button">Clear</button>
+        </div>
+        <div id="evTypeList"></div>
+      </nav>
+      <div class="ev-main">
+        <p class="ev-summary" id="evSummary"></p>
+        <div class="table-scroll" id="evTableWrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p id="footerMain">Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session on the site in the period, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.</p>
+    <details>
+      <summary>Notes on how this was put together</summary>
+      <p>Sessions are grouped first by the page they started on, which is why the total matches Google Analytics' own session count rather than only counting homepage arrivals. From each of those pages the report asks Google Analytics which pages sessions opened next, and traces onward branch by branch as far as each branch's own traffic supports. Smaller paths are grouped into "Other pages" so no branch becomes a wall of tiny entries — the same rollup Google Analytics uses for its own long tail. "Other pages" is a group rather than one page, so it isn't linked or expandable. Current Promotions isn't linked either — it no longer exists on the site, though sessions that visited it while it did are still counted.</p>
+    </details>
+  </footer>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+/* =========================================================
+   1. FALLBACK DATA — shown when the live feed isn't reachable.
+   Same shape the Apps Script returns: the trunk is every session,
+   its children are the pages those sessions started on.
+========================================================= */
+const ROOT_NAME = '__all__';
+
+const FALLBACK_TREE = {
+  name: ROOT_NAME, value: 9420,
+  children: [
+    { name: "/", value: 3315, children: [
+      { name: "/contact-us/", value: 290 },
+      { name: "/gas-detection/multi-gas-detection/", value: 131, children: [
+        { name: "/project/gasalert-microclip-series/", value: 27, children: [
+          { name: "/contact-us/", value: 6 },
+          { name: "Others", value: 21 },
+        ]},
+        { name: "/project/multi-gas-clip-simple-plus/", value: 11 },
+        { name: "/project/altair-4xr/", value: 9 },
+        { name: "/project/g8-portable-gas-detector/", value: 8 },
+        { name: "/project/multi-gas-clip-infrared/", value: 7 },
+        { name: "Others", value: 69 },
+      ]},
+      { name: "/gas-detection/single-gas-detection/", value: 66, children: [
+        { name: "/project/bw-clip-series/", value: 9 },
+        { name: "/gas-detection/multi-gas-detection/", value: 8 },
+        { name: "/fixed-gas-detection/", value: 4 },
+        { name: "/project/pac-6500/", value: 4 },
+        { name: "/contact-us/", value: 3 },
+        { name: "Others", value: 38 },
+      ]},
+      { name: "/about-electrogas/", value: 64, children: [
+        { name: "/contact-us/", value: 11 },
+        { name: "/join-our-team/", value: 7 },
+        { name: "/service/", value: 5 },
+        { name: "Others", value: 41 },
+      ]},
+      { name: "/join-our-team/", value: 45 },
+      { name: "/rental-equipment/gas-detection-rentals/", value: 45 },
+      { name: "/calibration-equipment/", value: 36 },
+      { name: "/gas-detection/", value: 33 },
+      { name: "/service/", value: 28 },
+      { name: "/electrogas-mini-catalogue/", value: 26 },
+      { name: "Others", value: 2551 },
+    ]},
+    { name: "/contact-us/", value: 1180, children: [
+      { name: "/", value: 96 },
+      { name: "/about-electrogas/", value: 41 },
+      { name: "/join-our-team/", value: 28 },
+      { name: "Others", value: 1015 },
+    ]},
+    { name: "/gas-detection/multi-gas-detection/", value: 940, children: [
+      { name: "/project/gasalert-microclip-series/", value: 118, children: [
+        { name: "/contact-us/", value: 24 },
+        { name: "/gas-detection/multi-gas-detection/", value: 16 },
+        { name: "Others", value: 78 },
+      ]},
+      { name: "/project/altair-4xr/", value: 71 },
+      { name: "/project/multi-gas-clip-simple-plus/", value: 63 },
+      { name: "/", value: 54 },
+      { name: "/contact-us/", value: 38 },
+      { name: "Others", value: 596 },
+    ]},
+    { name: "/join-our-team/", value: 612 },
+    { name: "/rental-equipment/gas-detection-rentals/", value: 486, children: [
+      { name: "/rental-equipment/", value: 44 },
+      { name: "/contact-us/", value: 37 },
+      { name: "Others", value: 405 },
+    ]},
+    { name: "/gas-detection/single-gas-detection/", value: 431, children: [
+      { name: "/project/bw-clip-series/", value: 52 },
+      { name: "/project/pac-6500/", value: 31 },
+      { name: "/contact-us/", value: 22 },
+      { name: "Others", value: 326 },
+    ]},
+    { name: "/calibration-equipment/", value: 388 },
+    { name: "/about-electrogas/", value: 317, children: [
+      { name: "/contact-us/", value: 46 },
+      { name: "/join-our-team/", value: 33 },
+      { name: "/service/", value: 21 },
+      { name: "Others", value: 217 },
+    ]},
+    { name: "/project/gasalert-microclip-series/", value: 274 },
+    { name: "/fixed-gas-detection/", value: 231 },
+    { name: "/electrogas-mini-catalogue/", value: 208 },
+    { name: "/self-contained-breathing-apparatus/", value: 176 },
+    { name: "/service/", value: 164 },
+    { name: "/fall-protection-equipment/", value: 149 },
+    { name: "/gas-detection/area-gas-detection/", value: 131 },
+    { name: "/respiratory-protection/", value: 118 },
+    { name: "/products/", value: 96 },
+    { name: "Others", value: 204 },
+  ]
+};
+
+const FALLBACK_EVENTS_BY_PAGE = [
+  { page: "/contact-us/", event: "generate_lead", count: 74, sessions: 68, keyEvent: true },
+  { page: "/contact-us/", event: "click", count: 132, sessions: 96, keyEvent: false },
+  { page: "/electrogas-mini-catalogue/", event: "file_download", count: 91, sessions: 77, keyEvent: false },
+  { page: "/gas-detection/multi-gas-detection/", event: "click", count: 186, sessions: 141, keyEvent: false },
+  { page: "/gas-detection/multi-gas-detection/", event: "view_search_results", count: 24, sessions: 21, keyEvent: false },
+  { page: "/rental-equipment/gas-detection-rentals/", event: "generate_lead", count: 29, sessions: 28, keyEvent: true },
+  { page: "/project/gasalert-microclip-series/", event: "click", count: 63, sessions: 49, keyEvent: false },
+  { page: "/join-our-team/", event: "form_submit", count: 18, sessions: 18, keyEvent: true },
+  { page: "/service/", event: "click", count: 41, sessions: 34, keyEvent: false },
+];
+
+const FALLBACK_PAGE_SESSIONS = {
+  "/contact-us/": 1604, "/electrogas-mini-catalogue/": 302,
+  "/gas-detection/multi-gas-detection/": 1183, "/rental-equipment/gas-detection-rentals/": 574,
+  "/project/gasalert-microclip-series/": 495, "/join-our-team/": 668, "/service/": 233,
+};
+
+/* =========================================================
+   2. NAMING, COLOURS, SHARED HELPERS
+========================================================= */
+const SITE = "https://www.electrogasmonitors.com";
+// "/current-promotions/" is no longer a live page on the site, so it is
+// shown in the chart but not linked.
+const UNLINKABLE = new Set([ROOT_NAME, "Others", "Other pages", "Other events", "(not set)", "/current-promotions/"]);
+function urlFor(path){ return UNLINKABLE.has(path) ? null : SITE + path; }
+
+const LABELS = {
+  "/": "Homepage",
+  "Others": "Other pages",
+  "/about-electrogas/": "About Electrogas",
+  "/air-carts-air-trailers/": "Air Carts & Trailers",
+  "/benzene-landing-page/": "Benzene Landing Page",
+  "/calibration-equipment/": "Calibration Equipment",
+  "/contact-us/": "Contact Us",
+  "/current-promotions/": "Current Promotions",
+  "/electrogas-mini-catalogue/": "Mini Catalogue",
+  "/fall-protection-equipment/": "Fall Protection Equipment",
+  "/faqs/": "FAQs",
+  "/fixed-gas-detection/": "Fixed Gas Detection",
+  "/gas-detection/": "Gas Detection",
+  "/gas-detection/area-gas-detection/": "Area Gas Detection",
+  "/gas-detection/gas-detection-tubes/": "Gas Detection Tubes",
+  "/gas-detection/multi-gas-detection/": "Multi-Gas Detectors",
+  "/gas-detection/single-gas-detection/": "Single-Gas Detectors",
+  "/gas-detection/specialty-gas-detection/": "Specialty Gas Detection",
+  "/join-our-team/": "Join Our Team",
+  "/online-training/": "Online Training",
+  "/products/": "Products",
+  "/project/04-series/": "04 Series",
+  "/project/altair-2x/": "Altair 2X",
+  "/project/altair-4xr/": "Altair 4XR",
+  "/project/arearae-plus/": "AreaRAE Plus",
+  "/project/bw-clip-series/": "BW Clip Series",
+  "/project/bw-flex-5/": "BW Flex 5",
+  "/project/bw-flex/": "BW Flex",
+  "/project/g6-single-gas/": "G6 Single-Gas",
+  "/project/g7-c-x/": "G7c",
+  "/project/g8-portable-gas-detector/": "G8 Portable",
+  "/project/gasalert-microclip-series/": "GasAlert MicroClip",
+  "/project/gx-3r/": "GX-3R",
+  "/project/gx-force/": "GX Force",
+  "/project/multi-gas-clip-infrared/": "Multi-Gas Clip (Infrared)",
+  "/project/multi-gas-clip-pump-infrared/": "Multi-Gas Clip (Pump IR)",
+  "/project/multi-gas-clip-simple-plus/": "Multi-Gas Clip (Simple+)",
+  "/project/multi-gas-clip-simple/": "Multi-Gas Clip (Simple)",
+  "/project/pac-6500/": "Pac 6500",
+  "/project/pac-8000/": "Pac 8000",
+  "/project/single-gas-clip/": "Single-Gas Clip",
+  "/project/toxirae-pro-pid/": "ToxiRAE Pro PID",
+  "/project/x-am-2500/": "X-am 2500",
+  "/project/x-am-5000/": "X-am 5000",
+  "/project/x-am-5600/": "X-am 5600",
+  "/rental-equipment/": "Rental Equipment",
+  "/rental-equipment/gas-detection-rentals/": "Gas Detection Rentals",
+  "/respiratory-protection/": "Respiratory Protection",
+  "/self-contained-breathing-apparatus/": "Breathing Apparatus (SCBA)",
+  "/service/": "Service",
+};
+function friendly(path){
+  if (path === ROOT_NAME) return 'All sessions';
+  if (LABELS[path]) return LABELS[path];
+  if (path === '/') return 'Homepage';
+  if (path === 'Others') return 'Other pages';
+  const seg = String(path).replace(/\/$/, '').split('/').filter(Boolean).pop() || path;
+  return seg.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+function humanizeEventName(name){
+  return String(name).split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+const COLORS = { root:'#2E3644', home:'#B8C0CC', product:'#E3A857', company:'#4EC0C9', conversion:'#D9694F', other:'#6E7580' };
+const KEY_EVENT_COLOR = '#B8860B';
+const PRODUCT = ['/project', '/gas-detection', '/fixed-gas-detection', '/self-contained-breathi', '/respiratory-protection',
+                 '/fall-protection-equip', '/calibration-equipment', '/rental-equipment', '/electrogas-mini-catal',
+                 '/products', '/air-carts-air-trailers'];
+const COMPANY = ['/about-electrogas', '/join-our-team', '/faqs', '/service', '/online-training'];
+const CONVERSION = ['/contact-us', '/current-promotions', '/benzene-landing-page'];
+function categorize(path){
+  if (path === ROOT_NAME) return 'root';
+  if (path === '/') return 'home';
+  if (UNLINKABLE.has(path)) return 'other';
+  if (PRODUCT.some(p => path.startsWith(p))) return 'product';
+  if (COMPANY.some(p => path.startsWith(p))) return 'company';
+  if (CONVERSION.some(p => path.startsWith(p))) return 'conversion';
+  return 'other';
+}
+function colorFor(path){ return COLORS[categorize(path)]; }
+const fmt = n => Number(n || 0).toLocaleString();
+
+/* ---- tooltip ---- */
+const tooltip = document.getElementById('tooltip');
+function showTip(html, evt){ tooltip.innerHTML = html; tooltip.classList.add('show'); moveTip(evt); }
+function moveTip(evt){
+  const pad = 14;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + 300 > window.innerWidth) x = evt.clientX - 300 - pad;
+  if (y + 110 > window.innerHeight) y = evt.clientY - 110 - pad;
+  tooltip.style.left = x + 'px'; tooltip.style.top = y + 'px';
+}
+function hideTip(){ tooltip.classList.remove('show'); }
+
+/* ---- label fitting, so text truncates to the space a column really has ---- */
+const _measure = document.createElement('canvas').getContext('2d');
+function textWidth(text, font){ _measure.font = font; return _measure.measureText(text).width; }
+function fit(text, font, maxW){
+  if (textWidth(text, font) <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && textWidth(t + '…', font) > maxW) t = t.slice(0, -1);
+  return t + '…';
+}
+
+/* =========================================================
+   3. STATE
+========================================================= */
+const state = {
+  tree: FALLBACK_TREE,
+  eventRows: FALLBACK_EVENTS_BY_PAGE,
+  pageSessions: FALLBACK_PAGE_SESSIONS,
+  eventsError: null,
+  periodLabel: '',
+  totalSessions: null,
+  view: 'pathway',
+  zoom: null,               // null = size itself to the space available
+  lastZoom: 1,
+  selected: [],            // starting-page paths currently on the chart
+  expanded: new Set(),      // keys of nodes whose next step is showing
+  pickerFilter: '',
+  evSearch: '',
+  evKeyOnly: false,
+  evTypes: new Set(),       // ticked event names; empty means "everything"
+  evGroup: 'page',          // 'page' = events under each page, 'event' = pages under each event
+  evSort: { key: 'count', dir: -1 },
+  evOpen: new Set(),
+};
+
+// Biggest first, but the "Other pages" rollup always sits last — it's a
+// leftover bucket, not a page competing for attention with the rest.
+function byValue(a, b){
+  const bucket = (UNLINKABLE.has(a.name) ? 1 : 0) - (UNLINKABLE.has(b.name) ? 1 : 0);
+  return bucket || (b.value - a.value);
+}
+function startingPages(){
+  return (state.tree.children || [])
+    .filter(c => c.value > 0 && !UNLINKABLE.has(c.name))
+    .slice().sort(byValue);
+}
+function rolledUpTotal(){
+  return (state.tree.children || [])
+    .filter(c => UNLINKABLE.has(c.name))
+    .reduce((s, c) => s + c.value, 0);
+}
+function findChild(node, name){ return (node.children || []).find(c => c.name === name) || null; }
+function keyOf(chain){ return chain.join('\u0001'); }
+
+/* Where each page sits in a journey, and the chain that leads to it.
+   Shallowest occurrence wins, so a page reachable several ways is
+   described by its earliest appearance. */
+let chainIndex = new Map();
+function buildChainIndex(){
+  chainIndex = new Map();
+  const walk = (node, chain) => {
+    (node.children || []).forEach(c => {
+      if (UNLINKABLE.has(c.name)) return;
+      const next = chain.concat([c.name]);
+      const seen = chainIndex.get(c.name);
+      if (!seen || next.length < seen.length) chainIndex.set(c.name, next);
+      walk(c, next);
+    });
+  };
+  walk(state.tree, []);
+}
+function stepLabel(path){
+  const chain = chainIndex.get(path);
+  if (!chain) return null;
+  return chain.length === 1 ? 'Starting page' : 'Page ' + chain.length;
+}
+
+/* =========================================================
+   4. HEADER STATS
+========================================================= */
+function renderStats(){
+  const total = state.tree.value || 0;
+  const shown = state.selected.reduce((s, p) => {
+    const n = findChild(state.tree, p);
+    return s + (n ? n.value : 0);
+  }, 0);
+  const stats = [
+    { n: fmt(total), l: 'sessions in total' },
+    { n: fmt(startingPages().length), l: 'pages sessions start on' },
+    { n: total ? Math.round((shown / total) * 100) + '%' : '0%', l: 'of sessions on the chart' },
+  ];
+  document.getElementById('stats').innerHTML =
+    stats.map(s => `<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+}
+
+/* =========================================================
+   5. THE PICKER
+========================================================= */
+function renderPicker(){
+  const list = document.getElementById('pickerList');
+  const q = state.pickerFilter.trim().toLowerCase();
+  const rows = startingPages().filter(c =>
+    !q || friendly(c.name).toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+
+  list.innerHTML = '';
+  if (!rows.length){
+    list.innerHTML = '<p class="picker-note">No page matches that.</p>';
+    return;
+  }
+  const total = state.tree.value || 1;
+  rows.forEach(c => {
+    const on = state.selected.includes(c.name);
+    const label = document.createElement('label');
+    label.className = 'pick' + (on ? ' on' : '');
+    label.innerHTML =
+      `<input type="checkbox" ${on ? 'checked' : ''}>` +
+      `<span class="dot" style="background:${colorFor(c.name)}"></span>` +
+      `<span class="nm" title="${c.name}">${friendly(c.name)}</span>` +
+      `<span class="c">${fmt(c.value)}</span>`;
+    label.title = friendly(c.name) + ' — ' + fmt(c.value) + ' sessions started here (' +
+      ((c.value / total) * 100).toFixed(1) + '% of all sessions)';
+    label.querySelector('input').addEventListener('change', e => toggleStart(c.name, e.target.checked));
+    list.appendChild(label);
+  });
+
+  const rollup = rolledUpTotal();
+  if (rollup && !q){
+    const note = document.createElement('p');
+    note.className = 'picker-note';
+    note.textContent = fmt(rollup) + ' sessions started on pages too small to list on their own.';
+    list.appendChild(note);
+  }
+}
+
+function toggleStart(path, on){
+  const i = state.selected.indexOf(path);
+  if (on && i === -1){
+    state.selected.push(path);
+    state.expanded.add(keyOf([path])); // show its first step straight away
+  }
+  if (!on && i !== -1){
+    state.selected.splice(i, 1);
+    [...state.expanded].forEach(k => { if (k === path || k.indexOf(path + '\u0001') === 0) state.expanded.delete(k); });
+  }
+  renderPicker();
+  renderStats();
+  renderChart();
+}
+
+function selectTop(n){
+  state.selected = startingPages().slice(0, n).map(c => c.name);
+  state.expanded = new Set(state.selected.map(p => keyOf([p])));
+  renderPicker(); renderStats(); renderChart();
+}
+
+/* =========================================================
+   6. THE CHART — one diagram, a branch per ticked page
+========================================================= */
+const ROW_H = 26;
+const PAD_T = 14;
+const BAR_W = 6;
+const BAR_MAX = 22;
+
+// What's actually on screen: the trunk, the ticked starting pages, and
+// beneath each of those only the steps the reader has opened.
+function buildVisible(){
+  const root = { name: ROOT_NAME, value: state.tree.value || 0, depth: 0, key: '', node: state.tree, children: [] };
+  const picked = startingPages().filter(c => state.selected.includes(c.name));
+  picked.forEach(c => root.children.push(makeVisible(c, [c.name], 1)));
+  return root;
+}
+function makeVisible(node, chain, depth){
+  const key = keyOf(chain);
+  const v = { name: node.name, value: node.value, depth, key, node, children: [] };
+  if (state.expanded.has(key) && node.children && node.children.length){
+    node.children.slice().sort(byValue).forEach(c => v.children.push(makeVisible(c, chain.concat([c.name]), depth + 1)));
+  }
+  return v;
+}
+function hasNextStep(v){ return !!(v.node.children && v.node.children.length) && !UNLINKABLE.has(v.name); }
+
+function renderChart(){
+  const svg = document.getElementById('chart');
+  const heads = document.getElementById('colHeads');
+  const scroll = document.getElementById('chartScroll');
+  svg.innerHTML = '';
+  heads.innerHTML = '';
+  const oldEmpty = scroll.querySelector('.chart-empty');
+  if (oldEmpty) oldEmpty.remove();
+
+  if (!state.selected.length){
+    svg.setAttribute('width', 0); svg.setAttribute('height', 0);
+    const box = document.createElement('div');
+    box.className = 'chart-empty';
+    box.innerHTML = '<p>Nothing on the chart yet. Tick a starting page on the left and its branch appears here — tick more and they stack up on the same diagram.</p><button type="button">Add the top 5 pages</button>';
+    box.querySelector('button').addEventListener('click', () => selectTop(5));
+    scroll.appendChild(box);
+    return;
+  }
+
+  const root = buildVisible();
+
+  // Vertical placement: each visible leaf gets a row, each parent sits
+  // level with the middle of its own children.
+  let slot = 0, maxDepth = 0;
+  (function place(v){
+    maxDepth = Math.max(maxDepth, v.depth);
+    if (!v.children.length){ v.y = PAD_T + slot * ROW_H + ROW_H / 2; slot++; return; }
+    v.children.forEach(place);
+    v.y = (v.children[0].y + v.children[v.children.length - 1].y) / 2;
+  })(root);
+
+  const cols = maxDepth + 1;
+  const avail = Math.max(320, scroll.clientWidth - 28);
+  const COL_W = Math.max(196, Math.min(300, Math.floor(avail / cols)));
+  const W = cols * COL_W;
+  const H = PAD_T * 2 + slot * ROW_H;
+
+  // Everything above is laid out in natural units; zoom only scales what
+  // gets drawn, via the viewBox. Left to itself the chart grows to fill
+  // the width it has, so a two- or three-column diagram uses the whole
+  // panel instead of sitting small in a band of empty space. It never
+  // shrinks on its own — a wide tree is better panned than squinted at —
+  // and stops at 180%, past which the type is larger than it is useful.
+  // The − and + buttons override all of this until Reset.
+  const zoom = state.zoom === null
+    ? Math.max(1, Math.min(1.8, avail / W))
+    : state.zoom;
+  state.lastZoom = zoom;
+  updateZoomLabel();
+
+  svg.setAttribute('width', Math.round(W * zoom));
+  svg.setAttribute('height', Math.round(H * zoom));
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // Column headers live outside the scrolling area so they stay put
+  // vertically, and are slid sideways to match instead — see syncHeads.
+  const headsInner = document.createElement('div');
+  headsInner.className = 'inner';
+  headsInner.style.width = Math.round(W * zoom) + 'px';
+  for (let d = 0; d < cols; d++){
+    const span = document.createElement('span');
+    span.style.left = Math.round(14 + d * COL_W * zoom) + 'px';
+    span.textContent = d === 0 ? 'All sessions' : d === 1 ? 'Started on' : d === 2 ? 'Then went to' : 'Page ' + d;
+    headsInner.appendChild(span);
+  }
+  heads.appendChild(headsInner);
+  syncHeads();
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+  const rootValue = root.value || 1;
+  // Square-root scale: a branch a tenth the size of another still reads
+  // as a visible ribbon rather than a hairline.
+  const barH = v => Math.max(2.5, BAR_MAX * Math.sqrt(v / rootValue));
+
+  const ribbonLayer = el('g', {});
+  const nodeLayer = el('g', {});
+  svg.appendChild(ribbonLayer);
+  svg.appendChild(nodeLayer);
+
+  const ribbons = [];  // { el, child }
+  const nodeEls = new Map(); // key -> group
+
+  (function draw(v, parentChain){
+    const x = v.depth * COL_W;
+    const h = barH(v.value);
+    const color = colorFor(v.name);
+    const chain = parentChain.concat([v]);
+
+    // ribbons out to whichever children are showing
+    if (v.children.length){
+      const sum = v.children.reduce((s, c) => s + c.value, 0) || 1;
+      let cursor = v.y - h / 2;
+      v.children.forEach(c => {
+        const srcH = Math.max(1.2, (c.value / sum) * h);
+        const y0s = cursor, y1s = cursor + srcH;
+        cursor += srcH;
+        const cH = barH(c.value);
+        const y0t = c.y - cH / 2, y1t = c.y + cH / 2;
+        const x0 = x + BAR_W, x1 = c.depth * COL_W;
+        const mid = (x0 + x1) / 2;
+        const p = el('path', {
+          class: 'ribbon',
+          d: `M${x0},${y0s} C${mid},${y0s} ${mid},${y0t} ${x1},${y0t} L${x1},${y1t} C${mid},${y1t} ${mid},${y1s} ${x0},${y1s} Z`,
+          fill: colorFor(c.name), 'fill-opacity': .3
+        });
+        ribbonLayer.appendChild(p);
+        ribbons.push({ el: p, child: c });
+      });
+    }
+
+    // the node itself
+    const g = el('g', { class: 'node' + (hasNextStep(v) ? ' can-open' : '') });
+    g.appendChild(el('rect', { x, y: v.y - h / 2, width: BAR_W, height: h, rx: 2, fill: color, 'fill-opacity': v.depth === 0 ? 1 : .95 }));
+    // Sits beneath the labels so the ↗ on the right stays clickable —
+    // the row's own handlers live on the group, so they fire wherever
+    // inside the row the pointer actually lands.
+    g.appendChild(el('rect', { class: 'node-hit', x, y: v.y - ROW_H / 2, width: COL_W - 6, height: ROW_H }));
+
+    const open = state.expanded.has(v.key);
+    const canOpen = hasNextStep(v);
+    const labelX = x + BAR_W + 8;
+    const nameX = labelX + (canOpen ? 12 : 0);
+    const valText = fmt(v.value) + (v.depth === 0 ? ' sessions' : '');
+    const valFont = '400 10.5px "IBM Plex Mono", monospace';
+    const valW = textWidth(valText, valFont);
+    const kUrl = urlFor(v.name);
+    const extW = kUrl ? 14 : 0;
+    const rightEdge = x + COL_W - 10;
+    const nameFont = v.depth === 0 ? '600 14px "IBM Plex Sans", sans-serif' : '500 12px "IBM Plex Sans", sans-serif';
+    const nameMax = Math.max(46, rightEdge - nameX - valW - extW - 12);
+
+    if (canOpen) g.appendChild(el('text', { class: 'n-chev', x: labelX, y: v.y, 'dominant-baseline': 'middle' }, open ? '▾' : '▸'));
+    g.appendChild(el('text', {
+      class: 'n-nm' + (v.depth === 0 ? ' root' : ''), x: nameX, y: v.y, 'dominant-baseline': 'middle'
+    }, fit(v.depth === 0 ? 'All sessions' : friendly(v.name), nameFont, nameMax)));
+    g.appendChild(el('text', {
+      class: 'n-val', x: rightEdge - extW, y: v.y, 'dominant-baseline': 'middle', 'text-anchor': 'end'
+    }, valText));
+    if (kUrl){
+      const a = el('text', { class: 'n-ext', x: rightEdge, y: v.y, 'dominant-baseline': 'middle', 'text-anchor': 'end' }, '↗');
+      a.addEventListener('click', e => { e.stopPropagation(); window.open(kUrl, '_blank', 'noopener'); });
+      a.appendChild(el('title', {}, 'Open ' + v.name));
+      g.appendChild(a);
+    }
+
+    g.addEventListener('mousemove', e => moveTip(e));
+    g.addEventListener('mouseenter', e => {
+      highlight(chain);
+      const parent = parentChain[parentChain.length - 1];
+      const pct = parent ? ((v.value / (parent.value || 1)) * 100).toFixed(1) + '% of ' +
+        (parent.depth === 0 ? 'all sessions' : friendly(parent.name)) : null;
+      const action = v.depth === 0 ? ''
+        : canOpen ? `<div class="t-meta" style="color:var(--cyan);margin-top:4px;">click to ${open ? 'close' : 'open'} the next step</div>`
+        : UNLINKABLE.has(v.name) ? '<div class="t-meta" style="margin-top:4px;">a group of smaller pages, not one single page</div>'
+        : '<div class="t-meta" style="margin-top:4px;">no onward pages traced from here</div>';
+      showTip(
+        `<div class="t-path">${v.depth === 0 ? 'All sessions' : friendly(v.name)}</div>` +
+        (UNLINKABLE.has(v.name) ? '' : `<div class="t-sub">${v.name}</div>`) +
+        `<div class="t-meta"><span class="t-val">${fmt(v.value)}</span> sessions${pct ? ' · ' + pct : ''}</div>` + action, e);
+    });
+    g.addEventListener('mouseleave', () => { clearHighlight(); hideTip(); });
+    if (canOpen) g.addEventListener('click', () => {
+      if (state.expanded.has(v.key)) collapseFrom(v.key); else state.expanded.add(v.key);
+      hideTip();
+      renderChart();
+    });
+    nodeLayer.appendChild(g);
+    nodeEls.set(v.key, g);
+
+    v.children.forEach(c => draw(c, chain));
+  })(root, []);
+
+  // Hovering a page dims everything that isn't on the way to it.
+  function highlight(chain){
+    const keys = new Set(chain.map(v => v.key));
+    ribbons.forEach(r => r.el.setAttribute('fill-opacity', keys.has(r.child.key) ? .72 : .07));
+    nodeEls.forEach((g, key) => g.classList.toggle('faded', !keys.has(key)));
+  }
+  function clearHighlight(){
+    ribbons.forEach(r => r.el.setAttribute('fill-opacity', .3));
+    nodeEls.forEach(g => g.classList.remove('faded'));
+  }
+}
+
+// Closing a step closes everything opened underneath it too, so
+// reopening it later starts from a clean single step.
+function collapseFrom(key){
+  [...state.expanded].forEach(k => { if (k === key || k.indexOf(key + '\u0001') === 0) state.expanded.delete(k); });
+}
+
+/* ---------------------------------------------------------
+   CHART SIZE — Reset hands sizing back to the chart itself.
+--------------------------------------------------------- */
+const ZOOM_MIN = 0.6, ZOOM_MAX = 2.5, ZOOM_STEP = 0.1;
+function updateZoomLabel(){
+  const btn = document.getElementById('zoomFit');
+  if (!btn) return;
+  btn.textContent = Math.round(state.lastZoom * 100) + '%';
+  btn.title = state.zoom === null
+    ? 'Sized to fit the space — use − and + to override'
+    : 'Back to the size that fits the space';
+}
+function nudgeZoom(dir){
+  const next = Math.round((state.lastZoom + dir * ZOOM_STEP) * 100) / 100;
+  state.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
+  renderChart();
+}
+document.getElementById('zoomOut').addEventListener('click', () => nudgeZoom(-1));
+document.getElementById('zoomIn').addEventListener('click', () => nudgeZoom(1));
+document.getElementById('zoomFit').addEventListener('click', () => { state.zoom = null; renderChart(); });
+
+/* Keeps the column headers lined up with however far the chart has
+   been scrolled or dragged sideways. */
+function syncHeads(){
+  const inner = document.querySelector('#colHeads .inner');
+  const scroll = document.getElementById('chartScroll');
+  if (inner && scroll) inner.style.transform = 'translateX(' + (-scroll.scrollLeft) + 'px)';
+}
+
+/* ---------------------------------------------------------
+   DRAG TO PAN — a hand tool for following a branch that runs
+   off the edge. Click and hold anywhere on the chart and drag:
+   sideways moves the chart's own scroller, up and down moves
+   the page with it, so a tall diagram and a wide one are both
+   reachable in one gesture.
+
+   Mouse only — touch devices keep their native scroll and
+   pinch gestures. A short movement threshold means an ordinary
+   click still opens a page or expands a step; only a real drag
+   swallows the click that follows it.
+--------------------------------------------------------- */
+(function enablePanning(){
+  const scrollEl = document.getElementById('chartScroll');
+  const THRESHOLD = 6;
+  let isDown = false, dragged = false, suppressClick = false;
+  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  let pendingDx = 0, pendingDy = 0, rafId = null;
+
+  function applyPan(){
+    scrollEl.scrollLeft = startLeft - pendingDx;
+    window.scrollTo(window.scrollX, startTop - pendingDy);
+    rafId = null;
+  }
+
+  scrollEl.addEventListener('pointerdown', evt => {
+    if (evt.pointerType === 'touch' || evt.button !== 0) return;
+    isDown = true; dragged = false;
+    startX = evt.clientX; startY = evt.clientY;
+    startLeft = scrollEl.scrollLeft; startTop = window.scrollY;
+    scrollEl.classList.add('grabbing');
+    document.body.classList.add('panning');
+  });
+
+  window.addEventListener('pointermove', evt => {
+    if (!isDown) return;
+    const dx = evt.clientX - startX, dy = evt.clientY - startY;
+    if (!dragged && (Math.abs(dx) > THRESHOLD || Math.abs(dy) > THRESHOLD)){ dragged = true; hideTip(); }
+    if (dragged){
+      pendingDx = dx; pendingDy = dy;
+      if (rafId === null) rafId = requestAnimationFrame(applyPan);
+    }
+  });
+
+  function endDrag(){
+    if (!isDown) return;
+    isDown = false;
+    scrollEl.classList.remove('grabbing');
+    document.body.classList.remove('panning');
+    if (dragged) suppressClick = true;
+  }
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+
+  // A drag that happens to end on a page still fires a native click —
+  // caught here, before it reaches the node, so panning never
+  // accidentally expands a step or opens a link.
+  scrollEl.addEventListener('click', evt => {
+    if (suppressClick){ evt.stopPropagation(); evt.preventDefault(); suppressClick = false; }
+  }, true);
+
+  scrollEl.addEventListener('scroll', syncHeads, { passive: true });
+})();
+
+/* =========================================================
+   7. EVENTS — a filter rail and a table that can be read
+   either way round: which events a page produced, or which
+   pages produced an event.
+========================================================= */
+
+// Sessions that included a page. Deliberately not a sum of its event
+// rows: one session firing two different events on a page would be
+// counted twice that way.
+function pageSessionsFor(page){
+  const map = state.pageSessions;
+  if (!map || map[page] === undefined || map[page] === null) return null;
+  return Number(map[page]);
+}
+
+const ORDINALS = ['Entry page', '2nd page', '3rd page', '4th page', '5th page', '6th page'];
+function stepLabel(path){
+  const chain = chainIndex.get(path);
+  if (!chain) return null;
+  return ORDINALS[chain.length - 1] || (chain.length + 'th page');
+}
+function stepCell(path){
+  const step = stepLabel(path);
+  return step
+    ? `<span class="step">${step}</span>`
+    : `<span class="step off" title="This page isn't on any path traced from a starting page this period">—</span>`;
+}
+
+// Every row still standing after the search box, the Key events button
+// and whatever is ticked in the rail.
+function filteredRows(){
+  const q = state.evSearch.trim().toLowerCase();
+  return (state.eventRows || []).filter(r => {
+    if (state.evKeyOnly && !r.keyEvent) return false;
+    if (state.evTypes.size && !state.evTypes.has(r.event)) return false;
+    if (!q) return true;
+    return friendly(r.page).toLowerCase().includes(q) || r.page.toLowerCase().includes(q) ||
+           humanizeEventName(r.event).toLowerCase().includes(q) || r.event.toLowerCase().includes(q);
+  });
+}
+
+/* ---- the filter rail ---- */
+function renderEventFilters(){
+  document.getElementById('evKeyBtn').classList.toggle('on', state.evKeyOnly);
+
+  const totals = new Map();
+  (state.eventRows || []).forEach(r => {
+    const t = totals.get(r.event) || { count: 0, keyEvent: false, pages: new Set() };
+    t.count += r.count; t.keyEvent = t.keyEvent || !!r.keyEvent; t.pages.add(r.page);
+    totals.set(r.event, t);
+  });
+
+  const q = state.evSearch.trim().toLowerCase();
+  let list = [...totals.entries()]
+    .filter(([name, t]) => !state.evKeyOnly || t.keyEvent)
+    .filter(([name]) => !q || humanizeEventName(name).toLowerCase().includes(q) || name.toLowerCase().includes(q))
+    .sort((a, b) => (b[1].keyEvent - a[1].keyEvent) || (b[1].count - a[1].count));
+
+  const wrap = document.getElementById('evTypeList');
+  wrap.innerHTML = '';
+  if (!list.length){
+    wrap.innerHTML = '<p class="picker-note">No event matches that.</p>';
+    return;
+  }
+
+  // Key events first under their own heading — they're what anyone
+  // scanning this is usually looking for.
+  let lastKey = null;
+  list.forEach(([name, t]) => {
+    if (t.keyEvent !== lastKey){
+      lastKey = t.keyEvent;
+      const h = document.createElement('div');
+      h.className = 'picker-group';
+      h.textContent = t.keyEvent ? 'Key events' : 'Everything else';
+      wrap.appendChild(h);
+    }
+    const on = state.evTypes.has(name);
+    const label = document.createElement('label');
+    label.className = 'pick' + (on ? ' on' : '');
+    label.title = humanizeEventName(name) + ' — ' + fmt(t.count) + ' times across ' +
+      t.pages.size + (t.pages.size === 1 ? ' page' : ' pages');
+    label.innerHTML =
+      `<input type="checkbox" ${on ? 'checked' : ''}>` +
+      (t.keyEvent ? '<span class="star">★</span>' : '<span class="dot" style="background:#7C5CBF"></span>') +
+      `<span class="nm">${humanizeEventName(name)}</span>` +
+      `<span class="c">${fmt(t.count)}</span>`;
+    label.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) state.evTypes.add(name); else state.evTypes.delete(name);
+      renderEvents();
+    });
+    wrap.appendChild(label);
+  });
+}
+
+/* ---- grouping ---- */
+function groupByPage(rows){
+  const map = new Map();
+  rows.forEach(r => {
+    if (!map.has(r.page)) map.set(r.page, []);
+    map.get(r.page).push(r);
+  });
+  return [...map.entries()].map(([page, evs]) => ({
+    id: 'page:' + page,
+    page,
+    title: friendly(page),
+    path: page,
+    color: colorFor(page),
+    url: urlFor(page),
+    chain: chainIndex.get(page),
+    sessions: pageSessionsFor(page),
+    count: evs.reduce((s, e) => s + e.count, 0),
+    keyCount: evs.filter(e => e.keyEvent).reduce((s, e) => s + e.count, 0),
+    children: evs.slice().sort((a, b) => b.count - a.count),
+  }));
+}
+function groupByEvent(rows){
+  const map = new Map();
+  rows.forEach(r => {
+    if (!map.has(r.event)) map.set(r.event, []);
+    map.get(r.event).push(r);
+  });
+  return [...map.entries()].map(([event, pgs]) => ({
+    id: 'event:' + event,
+    event,
+    title: humanizeEventName(event),
+    keyEvent: pgs.some(p => p.keyEvent),
+    pages: pgs.length,
+    count: pgs.reduce((s, p) => s + p.count, 0),
+    keyCount: pgs.filter(p => p.keyEvent).reduce((s, p) => s + p.count, 0),
+    children: pgs.slice().sort((a, b) => b.count - a.count),
+  }));
+}
+
+function sortGroups(groups){
+  const { key, dir } = state.evSort;
+  const stepDepth = p => (chainIndex.get(p) || { length: 99 }).length;
+  return groups.sort((a, b) => {
+    if (key === 'name') return dir * a.title.localeCompare(b.title);
+    if (key === 'step') return dir * (stepDepth(a.page) - stepDepth(b.page));
+    if (key === 'sessions') return dir * ((a.sessions || 0) - (b.sessions || 0));
+    if (key === 'pages') return dir * (a.pages - b.pages);
+    if (key === 'key') return dir * (a.keyCount - b.keyCount);
+    return dir * (a.count - b.count);
+  });
+}
+
+function renderEvents(){
+  renderEventFilters();
+  const wrap = document.getElementById('evTableWrap');
+  const summary = document.getElementById('evSummary');
+  wrap.innerHTML = '';
+
+  document.getElementById('evByPage').classList.toggle('active', state.evGroup === 'page');
+  document.getElementById('evByEvent').classList.toggle('active', state.evGroup === 'event');
+
+  if (state.eventsError){
+    summary.textContent = '';
+    wrap.innerHTML = `<div class="ev-empty">Events didn't load: ${state.eventsError}</div>`;
+    return;
+  }
+
+  const rows = filteredRows();
+  const byPage = state.evGroup === 'page';
+
+  // Headline numbers first, so the shape of the period is readable
+  // before anyone starts reading rows.
+  const totalTimes = rows.reduce((s, r) => s + r.count, 0);
+  const keyTimes = rows.filter(r => r.keyEvent).reduce((s, r) => s + r.count, 0);
+  const pageCount = new Set(rows.map(r => r.page)).size;
+  const typeCount = new Set(rows.map(r => r.event)).size;
+  const filtered = state.evKeyOnly || state.evTypes.size || state.evSearch.trim();
+  summary.innerHTML = rows.length
+    ? `<b>${fmt(keyTimes)}</b> <span class="star">★</span> key events and <b>${fmt(totalTimes - keyTimes)}</b> other events, ` +
+      `from <b>${fmt(typeCount)}</b> ${typeCount === 1 ? 'kind of event' : 'kinds of event'} across <b>${fmt(pageCount)}</b> ${pageCount === 1 ? 'page' : 'pages'}` +
+      (filtered ? ' <span style="color:var(--text-dimmer)">· filtered</span>' : '')
+    : '';
+
+  if (!rows.length){
+    const any = (state.eventRows || []).length;
+    wrap.innerHTML = `<div class="ev-empty">${any ? 'Nothing matches those filters.' : 'No events recorded for this period yet.'}` +
+      (any ? '<br><button type="button" id="evReset">Show everything again</button>' : '') + '</div>';
+    const reset = document.getElementById('evReset');
+    if (reset) reset.addEventListener('click', clearEventFilters);
+    return;
+  }
+
+  const groups = sortGroups(byPage ? groupByPage(rows) : groupByEvent(rows));
+  const maxCount = Math.max(...groups.map(g => g.count), 1);
+  const showSessions = byPage && groups.some(g => g.sessions !== null);
+  // A column of dashes tells nobody anything — the Key column only
+  // appears when something in view is actually a key event.
+  const showKey = byPage && groups.some(g => g.keyCount > 0);
+
+  const arrow = k => state.evSort.key === k ? `<span class="arrow">${state.evSort.dir === -1 ? '↓' : '↑'}</span>` : '';
+  const table = document.createElement('table');
+  table.className = 'ev';
+  table.innerHTML = byPage
+    ? `<thead><tr>
+         <th data-sort="name">Page ${arrow('name')}</th>
+         <th data-sort="step">Where in the journey ${arrow('step')}</th>
+         ${showSessions ? `<th data-sort="sessions" style="text-align:right" title="Sessions that included this page">Sessions ${arrow('sessions')}</th>` : ''}
+         ${showKey ? `<th data-sort="key" style="text-align:right">Key ${arrow('key')}</th>` : ''}
+         <th data-sort="count" style="text-align:right">Events ${arrow('count')}</th>
+         <th class="barcell"></th>
+         <th></th>
+       </tr></thead><tbody></tbody>`
+    : `<thead><tr>
+         <th data-sort="name">Event ${arrow('name')}</th>
+         <th data-sort="pages" style="text-align:right">Pages ${arrow('pages')}</th>
+         <th data-sort="count" style="text-align:right">Times ${arrow('count')}</th>
+         <th class="barcell"></th>
+         <th></th>
+       </tr></thead><tbody></tbody>`;
+
+  table.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.sort;
+      if (state.evSort.key === k) state.evSort.dir *= -1;
+      else state.evSort = { key: k, dir: (k === 'name' || k === 'step') ? 1 : -1 };
+      renderEvents();
+    });
+  });
+
+  const bar = (n, color) => `<td class="barcell"><div class="track"><div class="fill" style="width:${Math.max(3, (n / maxCount) * 100)}%;background:${color}"></div></div></td>`;
+  const tbody = table.querySelector('tbody');
+
+  groups.forEach(g => {
+    const open = state.evOpen.has(g.id);
+    const tr = document.createElement('tr');
+    tr.className = 'group-row' + (open ? ' open' : '');
+    tr.tabIndex = 0;
+    tr.setAttribute('role', 'button');
+    tr.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+    if (byPage){
+      tr.innerHTML =
+        `<td><span class="lead-cell"><span class="caret">▶</span><span class="dot" style="background:${g.color}"></span>` +
+          `<span style="min-width:0"><span class="nm">${g.title}</span><span class="path">${g.path}</span></span></span></td>` +
+        `<td>${stepCell(g.page)}</td>` +
+        (showSessions ? `<td class="num">${g.sessions === null ? '—' : fmt(g.sessions)}</td>` : '') +
+        (showKey ? `<td class="key">${g.keyCount ? '★ ' + fmt(g.keyCount) : '<span class="none">—</span>'}</td>` : '') +
+        `<td class="num lead">${fmt(g.count)}</td>` +
+        bar(g.count, g.color) +
+        `<td><span class="ev-actions">${g.chain ? '<button type="button" class="see-path">See path</button>' : ''}` +
+          `${g.url ? `<a href="${g.url}" target="_blank" rel="noopener">Open ↗</a>` : ''}</span></td>`;
+    } else {
+      tr.innerHTML =
+        `<td><span class="lead-cell"><span class="caret">▶</span>` +
+          `<span class="dot" style="background:${g.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF'}"></span>` +
+          `<span style="min-width:0"><span class="nm">${g.title}${g.keyEvent ? '<span class="keystar">★ Key event</span>' : ''}</span></span></span></td>` +
+        `<td class="num">${fmt(g.pages)}</td>` +
+        `<td class="num lead">${fmt(g.count)}</td>` +
+        bar(g.count, g.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF') +
+        `<td></td>`;
+    }
+
+    const toggle = () => {
+      if (open) state.evOpen.delete(g.id); else state.evOpen.add(g.id);
+      renderEvents();
+    };
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+    const seePath = tr.querySelector('.see-path');
+    if (seePath) seePath.addEventListener('click', e => { e.stopPropagation(); focusChain(g.chain); });
+    tr.querySelectorAll('a').forEach(a => a.addEventListener('click', e => e.stopPropagation()));
+    tbody.appendChild(tr);
+
+    if (!open) return;
+
+    g.children.forEach(c => {
+      const r = document.createElement('tr');
+      r.className = 'child-row';
+      if (byPage){
+        r.innerHTML =
+          `<td class="child-cell">${humanizeEventName(c.event)}${c.keyEvent ? '<span class="keystar">★ Key event</span>' : ''}</td>` +
+          `<td></td>` +
+          (showSessions ? `<td class="num">${c.sessions === undefined || c.sessions === null ? '—' : fmt(c.sessions)}</td>` : '') +
+          (showKey ? `<td class="key">${c.keyEvent ? '★ ' + fmt(c.count) : '<span class="none">—</span>'}</td>` : '') +
+          `<td class="num">${fmt(c.count)}</td>` +
+          bar(c.count, c.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF') +
+          `<td></td>`;
+      } else {
+        const url = urlFor(c.page), chain = chainIndex.get(c.page);
+        r.innerHTML =
+          `<td class="child-cell"><span class="nm" style="font-weight:500">${friendly(c.page)}</span>` +
+            `<span class="path">${c.page}</span></td>` +
+          `<td>${stepCell(c.page)}</td>` +
+          `<td class="num">${fmt(c.count)}</td>` +
+          bar(c.count, c.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF') +
+          `<td><span class="ev-actions">${chain ? '<button type="button" class="see-path">See path</button>' : ''}` +
+            `${url ? `<a href="${url}" target="_blank" rel="noopener">Open ↗</a>` : ''}</span></td>`;
+        const sp = r.querySelector('.see-path');
+        if (sp) sp.addEventListener('click', e => { e.stopPropagation(); focusChain(chain); });
+      }
+      tbody.appendChild(r);
+    });
+  });
+
+  wrap.appendChild(table);
+}
+
+function clearEventFilters(){
+  state.evTypes.clear();
+  state.evKeyOnly = false;
+  state.evSearch = '';
+  const box = document.getElementById('evSearch');
+  if (box) box.value = '';
+  renderEvents();
+}
+
+// Jump from an events row to the Pathway chart, with that page's branch
+// ticked and every step down to it already open.
+function focusChain(chain){
+  if (!chain || !chain.length) return;
+  const start = chain[0];
+  if (!state.selected.includes(start)) state.selected.push(start);
+  for (let i = 1; i <= chain.length; i++) state.expanded.add(keyOf(chain.slice(0, i)));
+  setView('pathway');
+  const scroll = document.getElementById('chartScroll');
+  if (scroll && scroll.scrollIntoView) scroll.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* =========================================================
+   8. VIEWS, PERIOD LOADING
+========================================================= */
+function setView(view){
+  state.view = view;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.getElementById('pathwayPanel').style.display = view === 'pathway' ? '' : 'none';
+  document.getElementById('eventsPanel').style.display = view === 'events' ? '' : 'none';
+  document.getElementById('legend').style.display = view === 'pathway' ? '' : 'none';
+  document.getElementById('footerMain').textContent = view === 'events'
+    ? 'Counts are sessions and the number of times each event fired. Gold ★ marks a Key Event — Google Analytics\' term for what used to be called a conversion. Automatic events (page views, scrolls, session starts) are left out so real actions stand out.'
+    : 'Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session on the site in the period, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.';
+  renderCurrent();
+}
+function renderCurrent(){
+  if (state.view === 'pathway'){ renderPicker(); renderStats(); renderChart(); }
+  else renderEvents();
+}
+
+document.querySelectorAll('.view-btn').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.getElementById('pickerSearch').addEventListener('input', e => { state.pickerFilter = e.target.value; renderPicker(); });
+document.getElementById('pickTop').addEventListener('click', () => selectTop(5));
+document.getElementById('pickAll').addEventListener('click', () => selectTop(startingPages().length));
+document.getElementById('pickClear').addEventListener('click', () => {
+  state.selected = []; state.expanded.clear();
+  renderPicker(); renderStats(); renderChart();
+});
+document.getElementById('evSearch').addEventListener('input', e => { state.evSearch = e.target.value; renderEvents(); });
+document.getElementById('evKeyBtn').addEventListener('click', () => { state.evKeyOnly = !state.evKeyOnly; renderEvents(); });
+document.getElementById('evClear').addEventListener('click', clearEventFilters);
+document.getElementById('evByPage').addEventListener('click', () => { state.evGroup = 'page'; state.evOpen.clear(); renderEvents(); });
+document.getElementById('evByEvent').addEventListener('click', () => { state.evGroup = 'event'; state.evOpen.clear(); renderEvents(); });
+
+// Columns size themselves to the space available, so a resize redraws.
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (state.view !== 'pathway') return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderChart, 120);
+});
+
+/* =========================================================
+   9. LIVE FEED — kept snappy three ways: a period already
+   fetched is re-shown from memory instead of re-fetched, the
+   periods you haven't opened yet are fetched quietly in the
+   background so the first switch is instant, and a slow answer
+   never blanks the chart — the old one stays put under a
+   spinner until the new one is ready.
+========================================================= */
+const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwLnBoPTfzAMu0HtlXw8zmXRih-y_gwA6MQ6QilUGaX_6mRlI4nuvbxPmuoDNiNa-Q_Lg/exec";
+
+const PERIODS = [
+  { mode: 'month', value: 0 },
+  { mode: 'month', value: 1 },
+  { mode: 'range', value: 6 },
+];
+const CLIENT_CACHE_MS = 10 * 60 * 1000; // after this, a shown period quietly refreshes itself
+const periodCache = new Map();          // 'month:1' -> payload
+const inFlight = new Map();             // one request per period, however many clicks
+let requestSeq = 0;                     // only the newest request is allowed to paint
+let prefetchStarted = false;
+
+const periodKey = (mode, value) => mode + ':' + value;
+
+function setDataStatus(text, ok){
+  const el = document.getElementById('dataStatus');
+  el.textContent = text;
+  el.classList.toggle('is-busy', ok === 'busy');
+  el.classList.toggle('is-live', ok === true);
+  el.classList.toggle('is-fallback', ok === false);
+}
+function setActivePeriodButton(mode, value){
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode && Number(btn.dataset.value) === value);
+  });
+}
+// Dims whichever panel is on screen and puts a spinner over it. The
+// chart underneath stays readable, so a slow period never leaves you
+// looking at an empty box.
+function setBusy(on){
+  document.getElementById('pathwayPanel').classList.toggle('busy', !!on);
+  document.getElementById('eventsPanel').classList.toggle('busy', !!on);
+}
+
+// Older deployments of the Apps Script rooted the tree at the homepage
+// rather than at all sessions. If that shape turns up, wrap it so the
+// chart still works — the trunk just reads as one branch.
+function normalizeTree(tree, totalSessions){
+  if (!tree) return null;
+  if (tree.name === ROOT_NAME) return tree;
+  return { name: ROOT_NAME, value: totalSessions || tree.value, children: [tree] };
+}
+
+function applyData(tree, eventRows, eventsError, pageSessions, totalSessions){
+  const firstLoad = !state.selected.length;
+  state.tree = normalizeTree(tree, totalSessions);
+  state.eventRows = eventRows || [];
+  state.eventsError = eventsError || null;
+  state.pageSessions = pageSessions || null;
+  buildChainIndex();
+
+  // Keep whatever was ticked if it still exists in the new period,
+  // otherwise start with the busiest few. Opened steps are kept too —
+  // any that no longer exist simply don't reappear.
+  const available = new Set(startingPages().map(c => c.name));
+  state.selected = state.selected.filter(p => available.has(p));
+  if (firstLoad || !state.selected.length) state.selected = startingPages().slice(0, 3).map(c => c.name);
+  state.selected.forEach(p => state.expanded.add(keyOf([p])));
+  state.evOpen.clear();
+  renderCurrent();
+}
+
+function showPayload(p){
+  state.periodLabel = p.month || '';
+  state.totalSessions = p.totalSessions || null;
+  setDataStatus('Live · ' + (p.month || 'this period') + ' · updated ' + p.stamp, true);
+  applyData(p.tree, p.eventRows, p.eventsError, p.pageSessions, p.totalSessions);
+}
+function showFallback(){
+  setDataStatus('Live feed unavailable right now — showing example data', false);
+  applyData(FALLBACK_TREE, FALLBACK_EVENTS_BY_PAGE, null, FALLBACK_PAGE_SESSIONS, FALLBACK_TREE.value);
+}
+
+// One fetch per period at a time: clicking the same button twice while
+// it's still loading joins the request already running rather than
+// starting a second one.
+function fetchPeriod(mode, value){
+  const key = periodKey(mode, value);
+  if (inFlight.has(key)) return inFlight.get(key);
+
+  const param = (mode === 'range') ? ('rangeMonths=' + value) : ('months=' + value);
+  const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
+  const promise = fetch(LIVE_DATA_URL + sep + param, { cache: 'no-store' })
+    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(data => {
+      if (!data || data.ok === false || !data.tree) throw new Error((data && data.error) || 'Malformed response');
+      const payload = {
+        tree: data.tree,
+        eventRows: data.eventsByPage || [],
+        eventsError: data.eventsByPageError || null,
+        pageSessions: data.pageSessions,
+        totalSessions: data.totalSessions,
+        month: data.month,
+        fetchedAt: Date.now(),
+        stamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      periodCache.set(key, payload);
+      return payload;
+    })
+    .finally(() => { inFlight.delete(key); });
+
+  inFlight.set(key, promise);
+  return promise;
+}
+
+async function loadPeriod(mode, value){
+  setActivePeriodButton(mode, value);
+  const key = periodKey(mode, value);
+  const seq = ++requestSeq;
+
+  if (!LIVE_DATA_URL){
+    setDataStatus('Showing example data — add your Apps Script URL to go live', false);
+    applyData(FALLBACK_TREE, FALLBACK_EVENTS_BY_PAGE, null, FALLBACK_PAGE_SESSIONS, FALLBACK_TREE.value);
+    return;
+  }
+
+  // Already have it: show it immediately, no spinner at all.
+  const cached = periodCache.get(key);
+  if (cached){
+    showPayload(cached);
+    setBusy(false);
+    // Getting on for stale — refresh behind the scenes and swap the
+    // numbers in when it lands, without interrupting anything.
+    if (Date.now() - cached.fetchedAt > CLIENT_CACHE_MS){
+      fetchPeriod(mode, value)
+        .then(fresh => { if (seq === requestSeq) showPayload(fresh); })
+        .catch(() => {});
+    }
+    startPrefetch(key);
+    return;
+  }
+
+  setBusy(true);
+  setDataStatus('Fetching ' + periodName(mode, value) + ' from Google Analytics…', 'busy');
+  try {
+    const payload = await fetchPeriod(mode, value);
+    if (seq !== requestSeq) return;   // a later click already won
+    showPayload(payload);
+  } catch (err){
+    if (seq !== requestSeq) return;
+    console.warn('Live GA4 feed unavailable, showing example data instead:', err);
+    showFallback();
+  } finally {
+    if (seq === requestSeq) setBusy(false);
+  }
+  startPrefetch(key);
+}
+
+function periodName(mode, value){
+  if (mode === 'range') return 'the last ' + value + ' months';
+  return value === 0 ? 'this month' : value === 1 ? 'last month' : 'that period';
+}
+
+// Once the first period is on screen, quietly collect the others so the
+// first click on them is instant. One at a time, and only after a pause,
+// so it never competes with what's actually being looked at.
+function startPrefetch(currentKey){
+  if (prefetchStarted || !LIVE_DATA_URL) return;
+  prefetchStarted = true;
+  setTimeout(async () => {
+    for (const p of PERIODS){
+      const k = periodKey(p.mode, p.value);
+      if (k === currentKey || periodCache.has(k)) continue;
+      try { await fetchPeriod(p.mode, p.value); } catch (err){ /* it'll be retried when clicked */ }
+    }
+  }, 1500);
+}
+
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', () => loadPeriod(btn.dataset.mode, Number(btn.dataset.value)));
+});
+
+setView('pathway');
+loadPeriod('month', 1); // last month on first load — a new month has little data in its first days
+</script>
+</body>
+</html>
