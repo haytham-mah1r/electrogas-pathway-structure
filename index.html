@@ -42,6 +42,13 @@
   .data-status.is-busy{color:var(--text-dim);}
   .data-status.is-busy::before{background:none;width:9px;height:9px;border:1.5px solid var(--line);border-top-color:var(--cyan);animation:spin .7s linear infinite;}
 
+  /* Shown when the numbers on screen aren't live Electrogas data, or
+     GA4 has hidden small rows — the small status pill alone was too
+     easy to miss. */
+  .notice{margin:0 0 12px;padding:8px 12px;border:1px solid #F0DCB8;background:#FBF5EA;color:#8A5A14;border-radius:6px;font-size:12px;line-height:1.5;}
+  .notice[hidden]{display:none;}
+  .notice.is-info{border-color:var(--line);background:#fff;color:var(--text-dim);}
+
   @keyframes spin{to{transform:rotate(360deg);}}
   .spinner{width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;flex:none;}
   .panel-wait{position:absolute;inset:0;z-index:8;display:none;align-items:center;justify-content:center;gap:9px;
@@ -179,7 +186,6 @@
   .ev-empty{padding:44px 20px;text-align:center;color:var(--text-dimmer);font-size:13px;}
   .ev-empty button{margin-top:10px;font-family:var(--font-body);font-size:12px;padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;color:var(--text);}
   .table-scroll{max-height:72vh;overflow:auto;}
-  .ev-empty{padding:40px 20px;text-align:center;color:var(--text-dimmer);font-size:13px;}
 
   #tooltip{position:fixed;pointer-events:none;z-index:50;background:#fff;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:6px;padding:8px 12px;font-size:12.5px;line-height:1.5;box-shadow:0 12px 30px rgba(27,32,39,0.14);opacity:0;transform:translateY(4px);transition:opacity .12s ease,transform .12s ease;max-width:320px;}
   #tooltip.show{opacity:1;transform:translateY(0);}
@@ -227,6 +233,7 @@
         <button class="view-btn" data-view="events" type="button">Events</button>
       </div>
     </div>
+    <p class="notice" id="notice" role="status" hidden></p>
     <div class="stats" id="stats"></div>
     <div class="legend" id="legend">
       <span class="legend-item"><span class="swatch" style="background:#E3A857"></span>Product &amp; equipment pages</span>
@@ -306,7 +313,9 @@
     <p id="footerMain">Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session on the site in the period, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.</p>
     <details>
       <summary>Notes on how this was put together</summary>
-      <p>Sessions are grouped first by the page they started on, which is why the total matches Google Analytics' own session count rather than only counting homepage arrivals. From each of those pages the report asks Google Analytics which pages sessions opened next, and traces onward branch by branch as far as each branch's own traffic supports. Smaller paths are grouped into "Other pages" so no branch becomes a wall of tiny entries — the same rollup Google Analytics uses for its own long tail. "Other pages" is a group rather than one page, so it isn't linked or expandable. Current Promotions isn't linked either — it no longer exists on the site, though sessions that visited it while it did are still counted.</p>
+      <p>Sessions are grouped first by the page they started on, which is why the total matches Google Analytics' own session count rather than only counting homepage arrivals. The step after a starting page counts sessions that started there and opened that page next. Steps further in count, among sessions that started on the same page, the ones that moved between those two pages. Google Analytics' reporting API doesn't hand out full step-by-step sequences (its Path Exploration report isn't available through it), so this is as close as it can get, and no step is ever shown larger than the page before it.</p>
+      <p>Addresses that differ only by a tracking code (?utm_…, ?gclid=…), a #section link, http/https, www or a trailing slash are counted as the same page. Smaller paths are grouped into "Other pages" so no branch becomes a wall of tiny entries; it's a group rather than one page, so it isn't linked or expandable. Current Promotions isn't linked either — it no longer exists on the site, though sessions that visited it while it did are still counted.</p>
+      <p>When Google Signals is switched on, Google Analytics withholds rows with very small counts to protect privacy. If that happened for the period on screen, a note appears at the top and some low-traffic steps may be missing.</p>
     </details>
   </footer>
 </div>
@@ -315,9 +324,9 @@
 
 <script>
 /* =========================================================
-   1. FALLBACK DATA — shown when the live feed isn't reachable.
-   Same shape the Apps Script returns: the trunk is every session,
-   its children are the pages those sessions started on.
+   1. FALLBACK DATA — example numbers, shown only when the live
+   feed can't be reached and no earlier real data is saved in
+   this browser. A banner says so whenever it's on screen.
 ========================================================= */
 const ROOT_NAME = '__all__';
 
@@ -518,6 +527,7 @@ function categorize(path){
 }
 function colorFor(path){ return COLORS[categorize(path)]; }
 const fmt = n => Number(n || 0).toLocaleString();
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
 /* ---- tooltip ---- */
 const tooltip = document.getElementById('tooltip');
@@ -550,6 +560,7 @@ const state = {
   pageSessions: FALLBACK_PAGE_SESSIONS,
   eventsError: null,
   periodLabel: '',
+  periodKey: null,          // which period is on screen, so a refresh of the same one keeps open rows open
   totalSessions: null,
   view: 'pathway',
   zoom: null,               // null = size itself to the space available
@@ -601,11 +612,6 @@ function buildChainIndex(){
   };
   walk(state.tree, []);
 }
-function stepLabel(path){
-  const chain = chainIndex.get(path);
-  if (!chain) return null;
-  return chain.length === 1 ? 'Starting page' : 'Page ' + chain.length;
-}
 
 /* =========================================================
    4. HEADER STATS
@@ -647,7 +653,7 @@ function renderPicker(){
     label.innerHTML =
       `<input type="checkbox" ${on ? 'checked' : ''}>` +
       `<span class="dot" style="background:${colorFor(c.name)}"></span>` +
-      `<span class="nm" title="${c.name}">${friendly(c.name)}</span>` +
+      `<span class="nm" title="${escapeHtml(c.name)}">${escapeHtml(friendly(c.name))}</span>` +
       `<span class="c">${fmt(c.value)}</span>`;
     label.title = friendly(c.name) + ' — ' + fmt(c.value) + ' sessions started here (' +
       ((c.value / total) * 100).toFixed(1) + '% of all sessions)';
@@ -659,7 +665,7 @@ function renderPicker(){
   if (rollup && !q){
     const note = document.createElement('p');
     note.className = 'picker-note';
-    note.textContent = fmt(rollup) + ' sessions started on pages too small to list on their own.';
+    note.textContent = fmt(rollup) + ' sessions started on pages too small to list on their own, or that Google Analytics couldn\'t give a starting page.';
     list.appendChild(note);
   }
 }
@@ -750,11 +756,8 @@ function renderChart(){
 
   // Everything above is laid out in natural units; zoom only scales what
   // gets drawn, via the viewBox. Left to itself the chart grows to fill
-  // the width it has, so a two- or three-column diagram uses the whole
-  // panel instead of sitting small in a band of empty space. It never
-  // shrinks on its own — a wide tree is better panned than squinted at —
-  // and stops at 180%, past which the type is larger than it is useful.
-  // The − and + buttons override all of this until Reset.
+  // the width it has, never shrinks on its own, and stops at 180%.
+  // The − and + buttons override this until the percentage is clicked.
   const zoom = state.zoom === null
     ? Math.max(1, Math.min(1.8, avail / W))
     : state.zoom;
@@ -830,9 +833,7 @@ function renderChart(){
     // the node itself
     const g = el('g', { class: 'node' + (hasNextStep(v) ? ' can-open' : '') });
     g.appendChild(el('rect', { x, y: v.y - h / 2, width: BAR_W, height: h, rx: 2, fill: color, 'fill-opacity': v.depth === 0 ? 1 : .95 }));
-    // Sits beneath the labels so the ↗ on the right stays clickable —
-    // the row's own handlers live on the group, so they fire wherever
-    // inside the row the pointer actually lands.
+    // Sits beneath the labels so the ↗ on the right stays clickable.
     g.appendChild(el('rect', { class: 'node-hit', x, y: v.y - ROW_H / 2, width: COL_W - 6, height: ROW_H }));
 
     const open = state.expanded.has(v.key);
@@ -867,14 +868,14 @@ function renderChart(){
       highlight(chain);
       const parent = parentChain[parentChain.length - 1];
       const pct = parent ? ((v.value / (parent.value || 1)) * 100).toFixed(1) + '% of ' +
-        (parent.depth === 0 ? 'all sessions' : friendly(parent.name)) : null;
+        (parent.depth === 0 ? 'all sessions' : escapeHtml(friendly(parent.name))) : null;
       const action = v.depth === 0 ? ''
         : canOpen ? `<div class="t-meta" style="color:var(--cyan);margin-top:4px;">click to ${open ? 'close' : 'open'} the next step</div>`
         : UNLINKABLE.has(v.name) ? '<div class="t-meta" style="margin-top:4px;">a group of smaller pages, not one single page</div>'
         : '<div class="t-meta" style="margin-top:4px;">no onward pages traced from here</div>';
       showTip(
-        `<div class="t-path">${v.depth === 0 ? 'All sessions' : friendly(v.name)}</div>` +
-        (UNLINKABLE.has(v.name) ? '' : `<div class="t-sub">${v.name}</div>`) +
+        `<div class="t-path">${v.depth === 0 ? 'All sessions' : escapeHtml(friendly(v.name))}</div>` +
+        (UNLINKABLE.has(v.name) ? '' : `<div class="t-sub">${escapeHtml(v.name)}</div>`) +
         `<div class="t-meta"><span class="t-val">${fmt(v.value)}</span> sessions${pct ? ' · ' + pct : ''}</div>` + action, e);
     });
     g.addEventListener('mouseleave', () => { clearHighlight(); hideTip(); });
@@ -908,7 +909,7 @@ function collapseFrom(key){
 }
 
 /* ---------------------------------------------------------
-   CHART SIZE — Reset hands sizing back to the chart itself.
+   CHART SIZE — clicking the percentage hands sizing back to the chart.
 --------------------------------------------------------- */
 const ZOOM_MIN = 0.6, ZOOM_MAX = 2.5, ZOOM_STEP = 0.1;
 function updateZoomLabel(){
@@ -937,16 +938,10 @@ function syncHeads(){
 }
 
 /* ---------------------------------------------------------
-   DRAG TO PAN — a hand tool for following a branch that runs
-   off the edge. Click and hold anywhere on the chart and drag:
-   sideways moves the chart's own scroller, up and down moves
-   the page with it, so a tall diagram and a wide one are both
-   reachable in one gesture.
-
-   Mouse only — touch devices keep their native scroll and
-   pinch gestures. A short movement threshold means an ordinary
-   click still opens a page or expands a step; only a real drag
-   swallows the click that follows it.
+   DRAG TO PAN — click and hold anywhere on the chart and drag:
+   sideways moves the chart's own scroller, up and down moves the
+   page. Mouse only; touch keeps native scrolling. A short movement
+   threshold means an ordinary click still opens a step.
 --------------------------------------------------------- */
 (function enablePanning(){
   const scrollEl = document.getElementById('chartScroll');
@@ -990,9 +985,8 @@ function syncHeads(){
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
 
-  // A drag that happens to end on a page still fires a native click —
-  // caught here, before it reaches the node, so panning never
-  // accidentally expands a step or opens a link.
+  // A drag that ends on a page still fires a click — caught here so
+  // panning never expands a step or opens a link by accident.
   scrollEl.addEventListener('click', evt => {
     if (suppressClick){ evt.stopPropagation(); evt.preventDefault(); suppressClick = false; }
   }, true);
@@ -1065,8 +1059,7 @@ function renderEventFilters(){
     return;
   }
 
-  // Key events first under their own heading — they're what anyone
-  // scanning this is usually looking for.
+  // Key events first under their own heading.
   let lastKey = null;
   list.forEach(([name, t]) => {
     if (t.keyEvent !== lastKey){
@@ -1084,7 +1077,7 @@ function renderEventFilters(){
     label.innerHTML =
       `<input type="checkbox" ${on ? 'checked' : ''}>` +
       (t.keyEvent ? '<span class="star">★</span>' : '<span class="dot" style="background:#7C5CBF"></span>') +
-      `<span class="nm">${humanizeEventName(name)}</span>` +
+      `<span class="nm">${escapeHtml(humanizeEventName(name))}</span>` +
       `<span class="c">${fmt(t.count)}</span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) state.evTypes.add(name); else state.evTypes.delete(name);
@@ -1157,15 +1150,13 @@ function renderEvents(){
 
   if (state.eventsError){
     summary.textContent = '';
-    wrap.innerHTML = `<div class="ev-empty">Events didn't load: ${state.eventsError}</div>`;
+    wrap.innerHTML = `<div class="ev-empty">Events didn't load: ${escapeHtml(state.eventsError)}</div>`;
     return;
   }
 
   const rows = filteredRows();
   const byPage = state.evGroup === 'page';
 
-  // Headline numbers first, so the shape of the period is readable
-  // before anyone starts reading rows.
   const totalTimes = rows.reduce((s, r) => s + r.count, 0);
   const keyTimes = rows.filter(r => r.keyEvent).reduce((s, r) => s + r.count, 0);
   const pageCount = new Set(rows.map(r => r.page)).size;
@@ -1189,8 +1180,6 @@ function renderEvents(){
   const groups = sortGroups(byPage ? groupByPage(rows) : groupByEvent(rows));
   const maxCount = Math.max(...groups.map(g => g.count), 1);
   const showSessions = byPage && groups.some(g => g.sessions !== null);
-  // A column of dashes tells nobody anything — the Key column only
-  // appears when something in view is actually a key event.
   const showKey = byPage && groups.some(g => g.keyCount > 0);
 
   const arrow = k => state.evSort.key === k ? `<span class="arrow">${state.evSort.dir === -1 ? '↓' : '↑'}</span>` : '';
@@ -1237,19 +1226,19 @@ function renderEvents(){
     if (byPage){
       tr.innerHTML =
         `<td><span class="lead-cell"><span class="caret">▶</span><span class="dot" style="background:${g.color}"></span>` +
-          `<span style="min-width:0"><span class="nm">${g.title}</span><span class="path">${g.path}</span></span></span></td>` +
+          `<span style="min-width:0"><span class="nm">${escapeHtml(g.title)}</span><span class="path">${escapeHtml(g.path)}</span></span></span></td>` +
         `<td>${stepCell(g.page)}</td>` +
         (showSessions ? `<td class="num">${g.sessions === null ? '—' : fmt(g.sessions)}</td>` : '') +
         (showKey ? `<td class="key">${g.keyCount ? '★ ' + fmt(g.keyCount) : '<span class="none">—</span>'}</td>` : '') +
         `<td class="num lead">${fmt(g.count)}</td>` +
         bar(g.count, g.color) +
         `<td><span class="ev-actions">${g.chain ? '<button type="button" class="see-path">See path</button>' : ''}` +
-          `${g.url ? `<a href="${g.url}" target="_blank" rel="noopener">Open ↗</a>` : ''}</span></td>`;
+          `${g.url ? `<a href="${escapeHtml(g.url)}" target="_blank" rel="noopener">Open ↗</a>` : ''}</span></td>`;
     } else {
       tr.innerHTML =
         `<td><span class="lead-cell"><span class="caret">▶</span>` +
           `<span class="dot" style="background:${g.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF'}"></span>` +
-          `<span style="min-width:0"><span class="nm">${g.title}${g.keyEvent ? '<span class="keystar">★ Key event</span>' : ''}</span></span></span></td>` +
+          `<span style="min-width:0"><span class="nm">${escapeHtml(g.title)}${g.keyEvent ? '<span class="keystar">★ Key event</span>' : ''}</span></span></span></td>` +
         `<td class="num">${fmt(g.pages)}</td>` +
         `<td class="num lead">${fmt(g.count)}</td>` +
         bar(g.count, g.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF') +
@@ -1274,7 +1263,7 @@ function renderEvents(){
       r.className = 'child-row';
       if (byPage){
         r.innerHTML =
-          `<td class="child-cell">${humanizeEventName(c.event)}${c.keyEvent ? '<span class="keystar">★ Key event</span>' : ''}</td>` +
+          `<td class="child-cell">${escapeHtml(humanizeEventName(c.event))}${c.keyEvent ? '<span class="keystar">★ Key event</span>' : ''}</td>` +
           `<td></td>` +
           (showSessions ? `<td class="num">${c.sessions === undefined || c.sessions === null ? '—' : fmt(c.sessions)}</td>` : '') +
           (showKey ? `<td class="key">${c.keyEvent ? '★ ' + fmt(c.count) : '<span class="none">—</span>'}</td>` : '') +
@@ -1284,13 +1273,13 @@ function renderEvents(){
       } else {
         const url = urlFor(c.page), chain = chainIndex.get(c.page);
         r.innerHTML =
-          `<td class="child-cell"><span class="nm" style="font-weight:500">${friendly(c.page)}</span>` +
-            `<span class="path">${c.page}</span></td>` +
+          `<td class="child-cell"><span class="nm" style="font-weight:500">${escapeHtml(friendly(c.page))}</span>` +
+            `<span class="path">${escapeHtml(c.page)}</span></td>` +
           `<td>${stepCell(c.page)}</td>` +
           `<td class="num">${fmt(c.count)}</td>` +
           bar(c.count, c.keyEvent ? KEY_EVENT_COLOR : '#7C5CBF') +
           `<td><span class="ev-actions">${chain ? '<button type="button" class="see-path">See path</button>' : ''}` +
-            `${url ? `<a href="${url}" target="_blank" rel="noopener">Open ↗</a>` : ''}</span></td>`;
+            `${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Open ↗</a>` : ''}</span></td>`;
         const sp = r.querySelector('.see-path');
         if (sp) sp.addEventListener('click', e => { e.stopPropagation(); focusChain(chain); });
       }
@@ -1323,7 +1312,7 @@ function focusChain(chain){
 }
 
 /* =========================================================
-   8. VIEWS, PERIOD LOADING
+   8. VIEWS
 ========================================================= */
 function setView(view){
   state.view = view;
@@ -1332,7 +1321,7 @@ function setView(view){
   document.getElementById('eventsPanel').style.display = view === 'events' ? '' : 'none';
   document.getElementById('legend').style.display = view === 'pathway' ? '' : 'none';
   document.getElementById('footerMain').textContent = view === 'events'
-    ? 'Counts are sessions and the number of times each event fired. Gold ★ marks a Key Event — Google Analytics\' term for what used to be called a conversion. Automatic events (page views, scrolls, session starts) are left out so real actions stand out.'
+    ? 'Counts are sessions and the number of times each event fired. Gold ★ marks a Key Event — Google Analytics\' term for what used to be called a conversion. Automatic events (page views, scrolls, session starts, engagement pings) are left out so real actions stand out.'
     : 'Counts are sessions — one visit by one person, however many pages they open in it. The figure at the trunk is every session on the site in the period, and the branches beneath it are the pages those sessions started on. A page marked ↗ opens the live page in a new tab.';
   renderCurrent();
 }
@@ -1364,12 +1353,16 @@ window.addEventListener('resize', () => {
 });
 
 /* =========================================================
-   9. LIVE FEED — kept snappy three ways: a period already
-   fetched is re-shown from memory instead of re-fetched, the
-   periods you haven't opened yet are fetched quietly in the
-   background so the first switch is instant, and a slow answer
-   never blanks the chart — the old one stays put under a
-   spinner until the new one is ready.
+   9. LIVE FEED
+   Fast three ways:
+   - The last answer for each period is saved in this browser, so
+     opening the report shows real numbers instantly and refreshes
+     them behind the scenes.
+   - A period already fetched this visit is re-shown from memory.
+   - The other periods are fetched quietly once the first is shown.
+   And honest about failure: if the feed can't be reached, earlier
+   real data stays on screen with a note, and the example numbers
+   only appear (with a banner saying so) when there's nothing real.
 ========================================================= */
 const LIVE_DATA_URL = "https://script.google.com/macros/s/AKfycbwLnBoPTfzAMu0HtlXw8zmXRih-y_gwA6MQ6QilUGaX_6mRlI4nuvbxPmuoDNiNa-Q_Lg/exec";
 
@@ -1378,20 +1371,43 @@ const PERIODS = [
   { mode: 'month', value: 1 },
   { mode: 'range', value: 6 },
 ];
-const CLIENT_CACHE_MS = 10 * 60 * 1000; // after this, a shown period quietly refreshes itself
-const periodCache = new Map();          // 'month:1' -> payload
-const inFlight = new Map();             // one request per period, however many clicks
-let requestSeq = 0;                     // only the newest request is allowed to paint
+const CLIENT_CACHE_MS  = 10 * 60 * 1000;  // older than this, a shown period refreshes itself quietly
+const FETCH_TIMEOUT_MS = 120 * 1000;      // give up on a request that hangs
+const STORE_PREFIX     = 'egPathway:v6:'; // bumped with the Apps Script, so old-shape data is ignored
+const periodCache = new Map();            // 'month:1' -> payload
+const inFlight = new Map();               // one request per period, however many clicks
+let requestSeq = 0;                       // only the newest request is allowed to paint
 let prefetchStarted = false;
 
 const periodKey = (mode, value) => mode + ':' + value;
 
-function setDataStatus(text, ok){
+function readStored(key){
+  try {
+    const raw = window.localStorage.getItem(STORE_PREFIX + key);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return p && p.tree ? p : null;
+  } catch (err){ return null; }
+}
+function writeStored(key, payload){
+  try { window.localStorage.setItem(STORE_PREFIX + key, JSON.stringify(payload)); }
+  catch (err){ /* storage full or blocked — the report still works without it */ }
+}
+
+function setDataStatus(text, ok, title){
   const el = document.getElementById('dataStatus');
   el.textContent = text;
+  el.title = title || '';
   el.classList.toggle('is-busy', ok === 'busy');
   el.classList.toggle('is-live', ok === true);
   el.classList.toggle('is-fallback', ok === false);
+}
+function setNotice(text, kind){
+  const el = document.getElementById('notice');
+  if (!text){ el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false;
+  el.textContent = text;
+  el.classList.toggle('is-info', kind === 'info');
 }
 function setActivePeriodButton(mode, value){
   document.querySelectorAll('.period-btn').forEach(btn => {
@@ -1399,79 +1415,107 @@ function setActivePeriodButton(mode, value){
   });
 }
 // Dims whichever panel is on screen and puts a spinner over it. The
-// chart underneath stays readable, so a slow period never leaves you
-// looking at an empty box.
+// chart underneath stays readable while the new period loads.
 function setBusy(on){
   document.getElementById('pathwayPanel').classList.toggle('busy', !!on);
   document.getElementById('eventsPanel').classList.toggle('busy', !!on);
 }
 
-// Older deployments of the Apps Script rooted the tree at the homepage
-// rather than at all sessions. If that shape turns up, wrap it so the
-// chart still works — the trunk just reads as one branch.
+// When the server built the numbers, in the reader's own time.
+function builtStamp(p){
+  const d = new Date(p.generatedAt || p.fetchedAt || Date.now());
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString()
+    ? time
+    : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + time;
+}
+
+// Older deployments rooted the tree at the homepage. If that shape
+// turns up, wrap it so the chart still works.
 function normalizeTree(tree, totalSessions){
   if (!tree) return null;
   if (tree.name === ROOT_NAME) return tree;
   return { name: ROOT_NAME, value: totalSessions || tree.value, children: [tree] };
 }
 
-function applyData(tree, eventRows, eventsError, pageSessions, totalSessions){
+function applyData(tree, eventRows, eventsError, pageSessions, totalSessions, key){
   const firstLoad = !state.selected.length;
+  const samePeriod = state.periodKey === key;
+  state.periodKey = key;
   state.tree = normalizeTree(tree, totalSessions);
   state.eventRows = eventRows || [];
   state.eventsError = eventsError || null;
   state.pageSessions = pageSessions || null;
   buildChainIndex();
 
-  // Keep whatever was ticked if it still exists in the new period,
-  // otherwise start with the busiest few. Opened steps are kept too —
-  // any that no longer exist simply don't reappear.
+  // Keep whatever was ticked if it still exists, otherwise start with
+  // the busiest three. Opened steps that no longer exist just don't show.
   const available = new Set(startingPages().map(c => c.name));
   state.selected = state.selected.filter(p => available.has(p));
   if (firstLoad || !state.selected.length) state.selected = startingPages().slice(0, 3).map(c => c.name);
   state.selected.forEach(p => state.expanded.add(keyOf([p])));
-  state.evOpen.clear();
+  if (!samePeriod) state.evOpen.clear();
   renderCurrent();
 }
 
-function showPayload(p){
+function showPayload(p, key){
   state.periodLabel = p.month || '';
   state.totalSessions = p.totalSessions || null;
-  setDataStatus('Live · ' + (p.month || 'this period') + ' · updated ' + p.stamp, true);
-  applyData(p.tree, p.eventRows, p.eventsError, p.pageSessions, p.totalSessions);
-}
-function showFallback(){
-  setDataStatus('Live feed unavailable right now — showing example data', false);
-  applyData(FALLBACK_TREE, FALLBACK_EVENTS_BY_PAGE, null, FALLBACK_PAGE_SESSIONS, FALLBACK_TREE.value);
+  const label = p.month || 'this period';
+  setDataStatus('Live · ' + label + ' · built ' + builtStamp(p), true,
+    p.range ? 'Google Analytics data from ' + p.range.start + ' to ' + p.range.end : '');
+  setNotice(p.thresholded
+    ? 'Google Analytics withheld some small counts for ' + label + ' (it does this when Google Signals is on), so a few low-traffic steps may be missing or slightly low.'
+    : '', 'info');
+  applyData(p.tree, p.eventRows, p.eventsError, p.pageSessions, p.totalSessions, key);
 }
 
-// One fetch per period at a time: clicking the same button twice while
-// it's still loading joins the request already running rather than
-// starting a second one.
+function showFallback(reason, key){
+  setDataStatus('Example data — not live', false);
+  setNotice('These are example numbers, not Electrogas data. The live Google Analytics feed couldn\'t be reached' +
+    (reason ? ' (' + reason + ')' : '') + '. Try the period again in a minute.');
+  applyData(FALLBACK_TREE, FALLBACK_EVENTS_BY_PAGE, null, FALLBACK_PAGE_SESSIONS, FALLBACK_TREE.value, 'fallback:' + key);
+}
+
+function friendlyError(err){
+  if (!err) return 'unknown error';
+  if (err.name === 'AbortError') return 'it took longer than ' + Math.round(FETCH_TIMEOUT_MS / 1000) + ' seconds to answer';
+  return String(err.message || err);
+}
+
+// One fetch per period at a time: clicking again while it's loading
+// joins the request already running.
 function fetchPeriod(mode, value){
   const key = periodKey(mode, value);
   if (inFlight.has(key)) return inFlight.get(key);
 
   const param = (mode === 'range') ? ('rangeMonths=' + value) : ('months=' + value);
   const sep = LIVE_DATA_URL.indexOf('?') === -1 ? '?' : '&';
-  const promise = fetch(LIVE_DATA_URL + sep + param, { cache: 'no-store' })
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS) : null;
+
+  const promise = fetch(LIVE_DATA_URL + sep + param, { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
     .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
     .then(data => {
-      if (!data || data.ok === false || !data.tree) throw new Error((data && data.error) || 'Malformed response');
+      if (!data || data.ok === false) throw new Error((data && data.error) || 'the feed sent back an empty answer');
+      if (!data.tree) throw new Error('the feed answered without a pathway tree');
       const payload = {
         tree: data.tree,
         eventRows: data.eventsByPage || [],
         eventsError: data.eventsByPageError || null,
-        pageSessions: data.pageSessions,
+        pageSessions: data.pageSessions || null,
         totalSessions: data.totalSessions,
         month: data.month,
+        range: data.range || null,
+        thresholded: !!data.thresholded,
+        generatedAt: data.generatedAt || null,
         fetchedAt: Date.now(),
-        stamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       periodCache.set(key, payload);
+      writeStored(key, payload);
       return payload;
     })
-    .finally(() => { inFlight.delete(key); });
+    .finally(() => { if (timer) clearTimeout(timer); inFlight.delete(key); });
 
   inFlight.set(key, promise);
   return promise;
@@ -1483,22 +1527,29 @@ async function loadPeriod(mode, value){
   const seq = ++requestSeq;
 
   if (!LIVE_DATA_URL){
-    setDataStatus('Showing example data — add your Apps Script URL to go live', false);
-    applyData(FALLBACK_TREE, FALLBACK_EVENTS_BY_PAGE, null, FALLBACK_PAGE_SESSIONS, FALLBACK_TREE.value);
+    setDataStatus('Example data — add your Apps Script URL to go live', false);
+    applyData(FALLBACK_TREE, FALLBACK_EVENTS_BY_PAGE, null, FALLBACK_PAGE_SESSIONS, FALLBACK_TREE.value, 'fallback:' + key);
     return;
   }
 
-  // Already have it: show it immediately, no spinner at all.
-  const cached = periodCache.get(key);
+  // Already have real data for this period (this visit, or saved from
+  // an earlier one): show it now, with no spinner.
+  let cached = periodCache.get(key);
+  if (!cached){
+    cached = readStored(key);
+    if (cached) periodCache.set(key, cached);
+  }
   if (cached){
-    showPayload(cached);
+    showPayload(cached, key);
     setBusy(false);
-    // Getting on for stale — refresh behind the scenes and swap the
-    // numbers in when it lands, without interrupting anything.
     if (Date.now() - cached.fetchedAt > CLIENT_CACHE_MS){
       fetchPeriod(mode, value)
-        .then(fresh => { if (seq === requestSeq) showPayload(fresh); })
-        .catch(() => {});
+        .then(fresh => { if (seq === requestSeq) showPayload(fresh, key); })
+        .catch(err => {
+          if (seq !== requestSeq) return;
+          setDataStatus('Saved · ' + (cached.month || periodName(mode, value)) + ' · built ' + builtStamp(cached) + ' · couldn\'t refresh', false,
+            'The live feed didn\'t answer: ' + friendlyError(err));
+        });
     }
     startPrefetch(key);
     return;
@@ -1509,11 +1560,11 @@ async function loadPeriod(mode, value){
   try {
     const payload = await fetchPeriod(mode, value);
     if (seq !== requestSeq) return;   // a later click already won
-    showPayload(payload);
+    showPayload(payload, key);
   } catch (err){
     if (seq !== requestSeq) return;
-    console.warn('Live GA4 feed unavailable, showing example data instead:', err);
-    showFallback();
+    console.warn('Live GA4 feed unavailable:', err);
+    showFallback(friendlyError(err), key);
   } finally {
     if (seq === requestSeq) setBusy(false);
   }
@@ -1525,17 +1576,18 @@ function periodName(mode, value){
   return value === 0 ? 'this month' : value === 1 ? 'last month' : 'that period';
 }
 
-// Once the first period is on screen, quietly collect the others so the
-// first click on them is instant. One at a time, and only after a pause,
-// so it never competes with what's actually being looked at.
+// Once the first period is on screen, quietly collect the others so
+// the first click on them is instant. One at a time, after a pause.
 function startPrefetch(currentKey){
   if (prefetchStarted || !LIVE_DATA_URL) return;
   prefetchStarted = true;
   setTimeout(async () => {
     for (const p of PERIODS){
       const k = periodKey(p.mode, p.value);
-      if (k === currentKey || periodCache.has(k)) continue;
-      try { await fetchPeriod(p.mode, p.value); } catch (err){ /* it'll be retried when clicked */ }
+      if (k === currentKey) continue;
+      const have = periodCache.get(k) || readStored(k);
+      if (have && Date.now() - have.fetchedAt < CLIENT_CACHE_MS) continue;
+      try { await fetchPeriod(p.mode, p.value); } catch (err){ /* retried when clicked */ }
     }
   }, 1500);
 }
